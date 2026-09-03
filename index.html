@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>body{margin:0;background:#0b0b0f;color:#f2f2f5;font:14px Inter,system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}#loginScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 15% 10%,#251a45,transparent 42%),radial-gradient(circle at 90% 90%,#261525,transparent 42%),#0b0b0f}.login-card{width:390px;padding:32px;background:#15151add;backdrop-filter:blur(22px);border:1px solid #292930;border-radius:18px;box-shadow:0 35px 80px #0009}.login-mark,.tb-logo{background:linear-gradient(135deg,#7c5cff,#c084fc)}.login-mark{width:32px;height:32px;border-radius:9px}.login-logo{display:flex;gap:10px;align-items:center}.login-title{font-weight:800}.login-sub,.login-note{color:#92929d;line-height:1.55}.login-note{font-size:11px;margin-top:18px;padding-top:15px;border-top:1px solid #292930}.field{margin:14px 0}.field label{display:block;color:#92929d;font-size:12px;margin-bottom:6px}.field input,select,textarea{width:100%;background:#1b1b21;border:1px solid #292930;color:#f2f2f5;border-radius:9px;padding:10px;outline:none}.btn-primary{width:100%;border:0;border-radius:9px;background:#7c5cff;color:#fff;padding:11px;font-weight:700;box-shadow:0 10px 25px #7c5cff33}.divider{display:flex;gap:10px;align-items:center;color:#62626d;font-size:11px;margin:18px 0}.divider:before,.divider:after{content:'';height:1px;background:#292930;flex:1}#app{display:none;height:100vh;grid-template-rows:52px 1fr 220px;grid-template-columns:280px minmax(0,1fr) 330px;grid-template-areas:'top top top' 'left center right' 'bottom bottom bottom'}#app.active{display:grid}#topbar{grid-area:top;display:flex;align-items:center;justify-content:space-between;padding:0 15px;background:#15151a;border-bottom:1px solid #292930}.tb-left,.tb-right{display:flex;align-items:center;gap:10px}.tb-logo{width:23px;height:23px;border-radius:7px}.tb-name{font-weight:800}.tb-project{color:#92929d;font-size:12px;border-left:1px solid #292930;padding-left:11px}.btn-ghost{background:transparent;border:1px solid #292930;color:#f2f2f5;border-radius:8px;padding:7px 11px;font-size:12px}.btn-render{border:0;background:#ff5470;color:#fff;border-radius:8px;padding:8px 13px;font-weight:700}.avatar{width:28px;height:28px;border-radius:50%;background:#332765;display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:800}.avatar img{width:100%;height:100%;object-fit:cover}#left{grid-area:left;background:#15151a;border-right:1px solid #292930;display:flex;flex-direction:column;overflow:hidden}.tabs{display:flex;border-bottom:1px solid #292930}.tab{flex:1;text-align:center;padding:11px;color:#92929d;font-size:12px;font-weight:700;border-bottom:2px solid transparent}.tab.active{color:#fff;border-color:#7c5cff}.tab-body{padding:13px;overflow:auto;flex:1}.import-btn{width:100%;padding:17px;border:1.5px dashed #41414a;background:transparent;color:#92929d;border-radius:10px}.import-btn:hover{border-color:#7c5cff;color:#fff}.media-item{display:flex;gap:8px;padding:7px;border-radius:9px;margin:6px 0}.media-item:hover{background:#1b1b21}.media-thumb{width:58px;height:34px;object-fit:cover;background:#000;border-radius:5px}.media-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.media-dur{font-size:10px;color:#62626d}.media-tag{font-size:9px;color:#c8bcff;background:#332765;padding:2px 5px;border-radius:4px}.section-label{font-size:11px;color:#92929d;font-weight:700;margin:14px 0 8px}.ai-box,.result-card{background:#1b1b21;border:1px solid #292930;border-radius:10px;padding:11px}.ai-run{width:100%;border:0;background:#7c5cff;color:#fff;border-radius:8px;padding:10px;font-weight:700}.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.feature-btn{background:#1b1b21;border:1px solid #292930;color:#fff;border-radius:10px;padding:11px 9px;text-align:left;min-height:84px}.feature-btn:hover{border-color:#7c5cff;transform:translateY(-1px)}.fb-title{font-size:12px;font-weight:800}.fb-sub{font-size:10px;color:#92929d;margin-top:4px;line-height:1.4}.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#7c5cff;margin-right:5px}#center{grid-area:center;background:#050506;display:flex;flex-direction:column}#previewWrap{flex:1;display:flex;align-items:center;justify-content:center}#previewVideo{max-width:100%;max-height:100%}.empty-preview{text-align:center;color:#62626d}.transport{display:flex;gap:10px;align-items:center;padding:8px 14px;background:#15151a;border-top:1px solid #292930}.tr-btn{width:30px;height:30px;border:1px solid #292930;background:#1b1b21;color:#fff;border-radius:7px}#right{grid-area:right;background:#15151a;border-left:1px solid #292930;padding:13px;overflow:auto}.panel-h{font-size:12px;font-weight:800;display:flex;align-items:center;margin-bottom:10px}.empty-right{color:#62626d;text-align:center;margin-top:45px;font-size:11px;line-height:1.6}.result-card{margin-bottom:9px;font-size:11px;line-height:1.55}.result-card h4{margin:0 0 6px;color:#c8bcff}.apply-btn{background:transparent;color:#c8bcff;border:1px solid #7c5cff;border-radius:6px;padding:5px 8px;font-size:10px;margin-top:7px}#bottom{grid-area:bottom;background:#15151a;border-top:1px solid #292930;display:flex;flex-direction:column;overflow:hidden}.tl-head{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #292930}.tl-title{font-size:12px;font-weight:800}.tl-hint{font-size:10px;color:#62626d;margin-left:8px}.tl-track-label{font-size:10px;color:#92929d;margin-bottom:6px}.tl-track{display:flex;gap:3px;height:64px;min-width:100%}#tlScroll{padding:14px;overflow:auto}.tl-clip{height:64px;min-width:110px;position:relative;background:linear-gradient(#302c55,#22203c);border:1px solid #6659d9;border-radius:7px;display:flex;align-items:flex-end;overflow:hidden}.tl-clip-label{font-size:10px;font-weight:700;padding:4px 6px;background:#0009;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tl-clip-dur{position:absolute;right:5px;top:4px;font-size:9px;color:#ddd}.trim-handle{position:absolute;top:0;bottom:0;width:8px}.trim-handle.left{left:0}.trim-handle.right{right:0}.trim-handle:hover{background:#7c5cff88}#toast{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:30;background:#1b1b21;border:1px solid #292930;padding:10px 15px;border-radius:9px;font-size:12px}#renderModal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:20}.render-card{width:370px;background:#15151a;border:1px solid #292930;border-radius:14px;padding:24px}.progress-bar{height:8px;background:#1b1b21;border-radius:4px;overflow:hidden;margin:14px 0}.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#7c5cff,#ff5470)}@media(max-width:1050px){#app{grid-template-columns:240px minmax(0,1fr);grid-template-areas:'top top' 'left center' 'bottom bottom'}#right{display:none}}@media(max-width:760px){#app{grid-template-columns:1fr;grid-template-areas:'top' 'center' 'bottom'}#left{display:none}.tb-project{display:none}}
 </style></head><body>
-<div id="loginScreen"><div class="login-card"><div class="login-logo"><div class="login-mark"></div><div class="login-title">ClipForge AI</div></div><p class="login-sub">Edit marketing videos with a clean, AI-assisted workflow. Your account and project metadata sync through Supabase.</p><button class="btn-primary" id="googleSignInBtn" onclick="signInWithGoogle()">Continue with Google</button><div class="divider">or use email</div><div class="field"><label>Your name</label><input id="loginName" placeholder="e.g. Sam"></div><div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="you@example.com"></div><button class="btn-primary" id="loginBtn">Send magic link</button><button class="btn-ghost" style="width:100%;margin-top:10px" onclick="signInAsGuest()">⚡ Continue as Guest (Testing)</button><div class="login-note">Authentication is handled by Supabase Auth. Imported video files stay in your browser; project/timeline metadata syncs to Supabase.</div></div></div>
+<div id="loginScreen"><div class="login-card"><div class="login-logo"><div class="login-mark"></div><div class="login-title">ClipForge AI</div></div><p class="login-sub">Edit marketing videos with a clean, AI-assisted workflow. Free in-browser video editor.</p><button class="btn-primary" id="googleSignInBtn" onclick="signInWithGoogle()">Continue with Google</button><div class="divider">or use email</div><div class="field"><label>Your name</label><input id="loginName" placeholder="e.g. Sam"></div><div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="you@example.com"></div><button class="btn-primary" id="loginBtn">Send magic link</button><button class="btn-ghost" style="width:100%;margin-top:10px" onclick="signInAsGuest()">⚡ Free Instant Access (Guest Mode)</button><div class="login-note">Authentication is handled by Supabase Auth. Imported video files stay in your browser; project/timeline metadata syncs locally.</div></div></div>
 <div id="app"><div id="topbar"><div class="tb-left"><div class="tb-logo"></div><div class="tb-name">ClipForge AI</div><div class="tb-project">Untitled marketing project</div></div><div class="tb-right"><button class="btn-ghost" onclick="triggerImport()">Import</button><button class="btn-ghost" onclick="saveProject(true)">Save</button><button class="btn-render" onclick="openRenderModal()">⤓ Render & Export</button><div class="avatar" id="avatarInit">?</div><button class="btn-ghost" onclick="signOut()">Sign out</button></div></div><div id="left"><div class="tabs"><div class="tab active" data-tab="media" onclick="switchTab('media')">Media</div><div class="tab" data-tab="ai" onclick="switchTab('ai')">AI Edit</div></div><div class="tab-body" id="tabMediaBody"><button class="import-btn" onclick="triggerImport()">＋ Import video clips</button><input type="file" id="fileInput" accept="video/*" multiple class="hidden"><div id="mediaList"></div></div><div class="tab-body hidden" id="tabAIBody"><div class="section-label">Prompt-based edit</div><div class="ai-box"><select id="tplSelect" onchange="applyTemplate()"><option value="">Custom prompt…</option><option value="hook">TikTok hook — punchy 3s intro</option><option value="reel">Instagram Reel — fast cuts</option><option value="highlights">Highlight reel</option><option value="captions">Bold caption suggestions</option><option value="silence">Tighten pacing</option></select><textarea id="promptInput" rows="4" placeholder="Describe the edit you want…"></textarea><button class="ai-run" onclick="runPromptEdit()">Generate edit plan</button></div><div class="section-label">AI tools</div><div class="feature-grid"><button class="feature-btn" onclick="runAutoTranscript()"><div class="fb-title"><span class="dot"></span>Auto Transcript</div><div class="fb-sub">Create caption-ready timing notes</div></button><button class="feature-btn" onclick="runAutoCut()"><div class="fb-title"><span class="dot"></span>Auto Cut</div><div class="fb-sub">Detect and trim silent gaps</div></button><button class="feature-btn" onclick="runAutoHook()"><div class="fb-title"><span class="dot"></span>Auto Hook</div><div class="fb-sub">Pick a strong opening moment</div></button><button class="feature-btn" onclick="runSceneChoose()"><div class="fb-title"><span class="dot"></span>Best Scenes</div><div class="fb-sub">Rank imported scenes</div></button></div></div></div><div id="center"><div id="previewWrap"><video id="previewVideo" controls playsinline style="display:none"></video><div id="emptyPreview" class="empty-preview"><div style="font-size:38px">▶</div><div>Import a clip and click it to preview</div></div></div><canvas id="canvasRender" width="1080" height="1920" style="display:none"></canvas><div class="transport"><button class="tr-btn" onclick="playPause()">⏯</button><span class="tr-time mono" id="tlTime">00:00 / 00:00</span><span class="tr-time" style="margin-left:auto" id="sequenceInfo">0 clips in sequence</span></div></div><div id="right"><div class="panel-h">AI Results <span id="syncState" style="margin-left:auto;color:#62626d;font-size:10px;font-weight:500">Ready</span></div><div id="resultsBody"><div class="empty-right">Run an AI tool or edit prompt. Results and actions appear here.</div></div></div><div id="bottom"><div class="tl-head"><div><span class="tl-title">Sequence</span><span class="tl-hint">Drag clips to reorder · drag edges to trim</span></div><button class="btn-ghost" onclick="clearTimeline()">Clear</button></div><div id="tlScroll"><div class="tl-track-label">Video track</div><div class="tl-track" id="track"></div></div></div></div><div id="toast"></div><div id="renderModal"><div class="render-card"><div class="panel-h">Rendering export</div><div id="renderStatus" style="font-size:12px;color:#92929d">Preparing…</div><div class="progress-bar"><div class="progress-fill" id="renderFill"></div></div><div id="renderNote" style="font-size:11px;color:#62626d"></div><button class="btn-ghost" style="margin-top:16px;width:100%" onclick="closeRenderModal()">Close</button></div></div>
 <script>
 const SUPABASE_URL = 'https://attrgssmemtipoingkpe.supabase.co';
@@ -23,7 +23,7 @@ const fmt = s => { s = Math.max(0, Number(s) || 0); return String(Math.floor(s/6
 
 function openDB() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open('clipforge_' + user.id.replace(/[^a-z0-9]/gi, '_'), 1);
+    const r = indexedDB.open('clipforge_' + (user ? user.id.replace(/[^a-z0-9]/gi, '_') : 'guest'), 1);
     r.onupgradeneeded = e => {
       const d = e.target.result;
       if (!d.objectStoreNames.contains('media')) d.createObjectStore('media', { keyPath: 'id' });
@@ -56,7 +56,10 @@ async function saveLocal() {
 }
 
 async function syncProject() {
-  if (!user || !supabaseClient || user.id.startsWith('guest_')) return;
+  if (!user || !supabaseClient || user.id.startsWith('guest_')) {
+    $('syncState').textContent = 'Local (Free Mode)';
+    return;
+  }
   const payload = { timeline: timeline.map(c => ({ ...c, url: undefined })), updated_at: new Date().toISOString() };
   if (cloudProjectId) {
     const r = await supabaseClient.from('projects').update(payload).eq('id', cloudProjectId).eq('user_id', user.id);
@@ -80,10 +83,10 @@ async function saveProject(show) {
   try {
     await saveLocal();
     await syncProject();
-    if (show) toast('Project saved');
+    if (show) toast('Project saved locally');
   } catch (e) {
     console.error(e);
-    $('syncState').textContent = 'Local';
+    $('syncState').textContent = 'Local Mode';
     if (show) toast('Saved locally');
   }
 }
@@ -93,12 +96,12 @@ async function completeLogin(u) {
   user = u;
 
   const m = u.user_metadata || {};
-  const name = m.full_name || m.name || u.email?.split('@')[0] || 'Guest';
+  const name = m.full_name || m.name || u.email?.split('@')[0] || 'Guest User';
   const pic = m.avatar_url || m.picture;
 
   $('loginScreen').style.display = 'none';
   $('app').classList.add('active');
-  $('avatarInit').innerHTML = pic ? `<img src="${esc(pic)}" referrerpolicy="no-referrer">` : esc(name[0]?.toUpperCase() || '?');
+  $('avatarInit').innerHTML = pic ? `<img src="${esc(pic)}" referrerpolicy="no-referrer">` : esc(name[0]?.toUpperCase() || 'G');
 
   try {
     await openDB();
@@ -110,71 +113,53 @@ async function completeLogin(u) {
   try {
     await syncProject();
   } catch (err) {
-    console.warn('Supabase project sync error:', err);
-    $('syncState').textContent = 'Local';
-  }
-
-  try {
-    if (supabaseClient && !u.id.startsWith('guest_')) {
-      await supabaseClient.from('profiles').upsert({
-        id: u.id,
-        display_name: name,
-        avatar_url: pic || null,
-        updated_at: new Date().toISOString()
-      });
-    }
-  } catch (err) {
-    console.warn('Profile sync error:', err);
+    console.warn('Supabase project sync warning:', err);
+    $('syncState').textContent = 'Local (Free Mode)';
   }
 }
 
 function signInAsGuest() {
-  const dummyUser = {
+  completeLogin({
     id: 'guest_12345',
     email: 'guest@clipforge.local',
-    user_metadata: {
-      full_name: 'Guest Tester'
-    }
-  };
-  completeLogin(dummyUser);
-  toast('Signed in as Guest');
+    user_metadata: { full_name: 'Guest User' }
+  });
+  toast('Signed in (Free Offline Mode)');
 }
 
 async function boot() {
-  if (!supabaseClient) {
-    console.error('Supabase client failed to initialize.');
-    return;
-  }
+  if (supabaseClient) {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        completeLogin(session.user);
+        if (window.location.hash || window.location.search.includes('code=')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+    });
 
-  supabaseClient.auth.onAuthStateChange((event, session) => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
     if (session && session.user) {
       completeLogin(session.user);
-      if (window.location.hash || window.location.search.includes('code=')) {
-        window.history.replaceState(null, '', window.location.pathname);
-      }
     }
-  });
-
-  const { data: { session }, error } = await supabaseClient.auth.getSession();
-  if (error) console.error('Get session error:', error);
-  if (session && session.user) {
-    completeLogin(session.user);
   }
 }
 
 async function signInWithGoogle() {
-  if (!supabaseClient) return toast('Supabase client not initialized');
+  if (!supabaseClient) {
+    toast('Supabase OAuth unavailable, launching Guest Mode...');
+    return signInAsGuest();
+  }
   const redirectUri = window.location.origin + window.location.pathname;
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
-    options: {
-      redirectTo: redirectUri
-    }
+    options: { redirectTo: redirectUri }
   });
 
   if (error) {
     console.error('OAuth sign-in error:', error);
-    toast(error.message);
+    toast('OAuth issue: Entering Free Mode');
+    signInAsGuest();
   }
 }
 
@@ -184,11 +169,18 @@ async function signOut() {
 }
 
 $('loginBtn').onclick = async () => {
-  if (!supabaseClient) return toast('Supabase client not initialized');
-  const email = $('loginEmail').value.trim(), name = $('loginName').value.trim() || 'Guest';
-  if (!email) return toast('Enter your email');
-  const r = await supabaseClient.auth.signInWithOtp({ email, options: { data: { full_name: name }, emailRedirectTo: location.origin + location.pathname } });
-  toast(r.error ? 'Could not send magic link' : 'Check your email for the magic link');
+  const email = $('loginEmail').value.trim(), name = $('loginName').value.trim() || 'User';
+  if (!email) {
+    signInAsGuest();
+    return;
+  }
+  if (supabaseClient) {
+    const r = await supabaseClient.auth.signInWithOtp({ email, options: { data: { full_name: name }, emailRedirectTo: location.origin + location.pathname } });
+    toast(r.error ? 'Using direct mode' : 'Check email for magic link');
+    if (r.error) signInAsGuest();
+  } else {
+    signInAsGuest();
+  }
 };
 
 function switchTab(t) {
@@ -230,7 +222,7 @@ async function addMediaFile(file) {
 }
 
 function renderMediaList() {
-  $('mediaList').innerHTML = media.map(m => `<div class="media-item" onclick="previewMedia('${m.id}')" draggable="true" ondragstart="dragMediaId='${m.id}'"><img class="media-thumb" src="${m.thumb || ''}"><div><div class="media-name">${esc(m.name)}</div><div class="media-dur">${fmt(m.duration)}</div><span class="media-tag">VIDEO</span></div></div>`).join('') || '<div style="color:#62626d;font-size:11px;padding:12px">No clips yet.</div>';
+  $('mediaList').innerHTML = media.map(m => `<div class="media-item" onclick="previewMedia('${m.id}')" draggable="true" ondragstart="dragMediaId='${m.id}'"><img class="media-thumb" src="${m.thumb || ''}"><div><div class="media-name">${esc(m.name)}</div><div class="media-dur">${fmt(m.duration)}</div><span class="media-tag">VIDEO</span></div></div>`).join('') || '<div style="color:#62626d;font-size:11px;padding:12px">No clips imported yet. Click Import above.</div>';
 }
 
 function previewMedia(id) {
@@ -252,7 +244,7 @@ $('track').ondrop = e => {
 };
 
 function renderTimeline() {
-  $('track').innerHTML = timeline.map((c, i) => `<div class="tl-clip" style="width:${Math.max(110, (c.trimOut - c.trimIn) * 28)}px" draggable="true" ondragstart="dragClipIdx=${i}" ondragover="event.preventDefault()" ondrop="dropClip(${i})"><span class="tl-clip-dur">${fmt(c.trimOut - c.trimIn)}</span><div class="trim-handle left" onmousedown="startTrim(event,${i},'left')"></div><div class="trim-handle right" onmousedown="startTrim(event,${i},'right')"></div><div class="tl-clip-label">${esc(c.name)}</div></div>`).join('') || '<div style="color:#62626d;font-size:11px">Drop imported clips here.</div>';
+  $('track').innerHTML = timeline.map((c, i) => `<div class="tl-clip" style="width:${Math.max(110, (c.trimOut - c.trimIn) * 28)}px" draggable="true" ondragstart="dragClipIdx=${i}" ondragover="event.preventDefault()" ondrop="dropClip(${i})"><span class="tl-clip-dur">${fmt(c.trimOut - c.trimIn)}</span><div class="trim-handle left" onmousedown="startTrim(event,${i},'left')"></div><div class="trim-handle right" onmousedown="startTrim(event,${i},'right')"></div><div class="tl-clip-label">${esc(c.name)}</div></div>`).join('') || '<div style="color:#62626d;font-size:11px">Drag clips here from Media tab or click Import.</div>';
   $('sequenceInfo').textContent = `${timeline.length} clip${timeline.length === 1 ? '' : 's'} in sequence`;
 }
 
@@ -299,9 +291,7 @@ async function logAI(feature, prompt, result) {
   if (user && supabaseClient && !user.id.startsWith('guest_')) {
     try {
       await supabaseClient.from('ai_runs').insert({ user_id: user.id, project_id: cloudProjectId, feature, prompt, result });
-    } catch (e) {
-      console.warn('AI run log failed:', e);
-    }
+    } catch (e) {}
   }
 }
 
@@ -343,7 +333,6 @@ async function runAutoCut() {
   toast('Analyzing sequence pacing…');
 
   let totalTrimmed = 0;
-
   for (let c of timeline) {
     const currentDur = c.trimOut - c.trimIn;
     if (currentDur <= 1) continue;
@@ -360,7 +349,7 @@ async function runAutoCut() {
     previewMedia(timeline[0].mediaId);
   }
 
-  toast(`Auto Cut trimmed ~${totalTrimmed.toFixed(1)}s of silent gaps across sequence!`);
+  toast(`Auto Cut trimmed ~${totalTrimmed.toFixed(1)}s across sequence!`);
 }
 
 async function runVisionAnalysis(mode) {
