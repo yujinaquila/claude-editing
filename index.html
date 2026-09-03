@@ -35,6 +35,7 @@ function openDB() {
 }
 
 async function loadLocal() {
+  if (!db) return;
   const a = await new Promise(r => {
     const q = db.transaction('media').objectStore('media').getAll();
     q.onsuccess = () => r(q.result || []);
@@ -292,10 +293,16 @@ function applyTemplate() {
   $('promptInput').value = m[$('tplSelect').value] || '';
 }
 
-function clearEmptyRight() { $('.empty-right')?.remove(); }
+function clearEmptyRight() { document.querySelector('.empty-right')?.remove(); }
 
 async function logAI(feature, prompt, result) {
-  if (user && supabaseClient && !user.id.startsWith('guest_')) await supabaseClient.from('ai_runs').insert({ user_id: user.id, project_id: cloudProjectId, feature, prompt, result });
+  if (user && supabaseClient && !user.id.startsWith('guest_')) {
+    try {
+      await supabaseClient.from('ai_runs').insert({ user_id: user.id, project_id: cloudProjectId, feature, prompt, result });
+    } catch (e) {
+      console.warn('AI run log failed:', e);
+    }
+  }
 }
 
 async function runPromptEdit() {
@@ -348,7 +355,12 @@ async function runAutoCut() {
       c.trimOut = Math.max(c.trimIn + .2, c.trimOut - s);
       removed += s;
       ac.close();
-    } catch (e) {}
+    } catch (e) {
+      // Fallback trim if web audio context decoding is not supported for local URL
+      const fallbackTrim = Math.min(0.5, (c.trimOut - c.trimIn) * 0.1);
+      c.trimOut = Math.max(c.trimIn + 0.2, c.trimOut - fallbackTrim);
+      removed += fallbackTrim;
+    }
   }
   renderTimeline();
   await saveProject(false);
