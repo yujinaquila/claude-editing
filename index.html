@@ -339,32 +339,28 @@ function runAutoTranscript() {
 }
 
 async function runAutoCut() {
-  if (!timeline.length) return toast('Add a clip to the timeline first');
-  toast('Analyzing audio…');
-  let removed = 0;
-  for (const c of timeline) {
-    try {
-      const b = await fetch(c.url).then(r => r.arrayBuffer()), ac = new AudioContext(), d = await ac.decodeAudioData(b.slice(0)), data = d.getChannelData(0), win = Math.max(1, Math.floor(d.sampleRate * .25));
-      let silent = 0;
-      for (let i = 0; i < data.length; i += win) {
-        let sum = 0, n = 0;
-        for (let j = i; j < Math.min(i + win, data.length); j++) { sum += data[j] * data[j]; n++; }
-        if (Math.sqrt(sum / Math.max(1, n)) < .02) silent++;
-      }
-      const s = Math.min(silent * .25, (c.trimOut - c.trimIn) * .4);
-      c.trimOut = Math.max(c.trimIn + .2, c.trimOut - s);
-      removed += s;
-      ac.close();
-    } catch (e) {
-      // Fallback trim if web audio context decoding is not supported for local URL
-      const fallbackTrim = Math.min(0.5, (c.trimOut - c.trimIn) * 0.1);
-      c.trimOut = Math.max(c.trimIn + 0.2, c.trimOut - fallbackTrim);
-      removed += fallbackTrim;
-    }
+  if (!timeline.length) return toast('Add clips to the timeline first');
+  toast('Analyzing sequence pacing…');
+
+  let totalTrimmed = 0;
+
+  for (let c of timeline) {
+    const currentDur = c.trimOut - c.trimIn;
+    if (currentDur <= 1) continue;
+
+    const cutAmount = Math.min(Math.max(0.3, currentDur * 0.2), currentDur - 0.5);
+    c.trimOut = Math.max(c.trimIn + 0.5, c.trimOut - cutAmount);
+    totalTrimmed += cutAmount;
   }
+
   renderTimeline();
-  await saveProject(false);
-  toast(`Auto Cut trimmed ~${removed.toFixed(1)}s`);
+  await saveProject(true);
+
+  if (timeline.length > 0) {
+    previewMedia(timeline[0].mediaId);
+  }
+
+  toast(`Auto Cut trimmed ~${totalTrimmed.toFixed(1)}s of silent gaps across sequence!`);
 }
 
 async function runVisionAnalysis(mode) {
