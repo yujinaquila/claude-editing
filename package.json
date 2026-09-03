@@ -24,3 +24,8 @@
     "typescript": "^5"
   }
 }
+"scripts": {
+  "dev": "next dev",
+  "build": "NODE_OPTIONS='--max-old-space-size=4096' next build --no-lint",
+  "start": "next start"
+}

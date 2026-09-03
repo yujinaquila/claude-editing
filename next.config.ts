@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Pass empty turbopack object to silence Vercel Turbopack build error
+  experimental: {
+    serverComponentsExternalPackages: ['@xenova/transformers', '@ffmpeg/ffmpeg'],
+  },
   async headers() {
     return [
       {
