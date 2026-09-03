@@ -324,7 +324,7 @@ async function addMediaFile(file) {
       c.getContext('2d').drawImage(v, 0, 0, 160, 90);
       const obj = { id, name: file.name, url, duration: v.duration, thumb: c.toDataURL('image/jpeg', .65) };
       media.push(obj);
-      timeline.push({ id: 'c_' + id, mediaId: id, name: file.name, url, url, duration: v.duration, trimIn: 0, trimOut: v.duration });
+      timeline.push({ id: 'c_' + id, mediaId: id, name: file.name, url: url, duration: v.duration, trimIn: 0, trimOut: v.duration });
       if (db) db.transaction('media', 'readwrite').objectStore('media').put(obj);
       renderMediaList();
       renderTimeline();
@@ -530,29 +530,69 @@ async function runPromptEdit() {
 
   await new Promise(r => setTimeout(r, 700));
 
-  const p = $('promptInput').value.trim() || 'Create a strong short-form edit';
-  const o = timeline.map(x => x.name);
-  const j = { summary: 'Build a concise marketing sequence with a strong opening and clear pacing.', hookLine: 'Stop scrolling — this is the moment to watch.', captionIdeas: ['Lead with the visual payoff.', 'Keep captions short and readable.', 'Finish with a clear call to action.'], suggestedOrder: o };
+  const rawPrompt = ($('promptInput').value.trim() || 'Create a fast short-form edit').toLowerCase();
+  
+  // Clone current sequence
+  let processedClips = JSON.parse(JSON.stringify(timeline));
+  let strategy = 'Custom Sequence Optimization';
+  let targetTrimPerClip = 0;
+
+  // Smart prompt analysis
+  if (rawPrompt.includes('hook') || rawPrompt.includes('intro') || rawPrompt.includes('tiktok')) {
+    strategy = 'TikTok Punchy Hook Pacing';
+    // Move longest clip to start as hook and cap to 3s
+    processedClips.sort((a, b) => (b.duration) - (a.duration));
+    processedClips[0].trimIn = 0;
+    processedClips[0].trimOut = Math.min(3, processedClips[0].duration);
+    targetTrimPerClip = 2.5;
+  } else if (rawPrompt.includes('fast') || rawPrompt.includes('reel') || rawPrompt.includes('beat')) {
+    strategy = 'Fast-Paced Rhythm Cuts';
+    targetTrimPerClip = 2.0;
+  } else if (rawPrompt.includes('silence') || rawPrompt.includes('tighten')) {
+    strategy = 'Gap Removal & Pacing Tightening';
+    targetTrimPerClip = 3.0;
+  } else {
+    targetTrimPerClip = 4.0;
+  }
+
+  // Apply intelligent clip bounds
+  let planSteps = [];
+  processedClips.forEach((c, idx) => {
+    const origDur = c.trimOut - c.trimIn;
+    if (targetTrimPerClip > 0 && origDur > targetTrimPerClip) {
+      c.trimOut = c.trimIn + targetTrimPerClip;
+    }
+    planSteps.push(`Clip ${idx + 1}: <b>${esc(c.name)}</b> trimmed to ${fmt(c.trimOut - c.trimIn)}`);
+  });
+
+  const planSummary = {
+    strategy,
+    steps: planSteps,
+    newClips: processedClips
+  };
+
   clearEmptyRight();
   const c = document.createElement('div');
   c.className = 'result-card';
-  c.innerHTML = `<h4>Edit plan</h4><div>${esc(j.summary)}</div><div><b>Hook:</b> ${esc(j.hookLine)}</div><ul>${j.captionIdeas.map(x => `<li>${esc(x)}</li>`).join('')}</ul><button class="apply-btn" onclick='applySuggestedOrder(this, ${JSON.stringify(o)})'>Apply order</button>`;
+  c.innerHTML = `
+    <h4>AI Edit Plan</h4>
+    <div><b>Strategy:</b> ${esc(strategy)}</div>
+    <ul style="padding-left:16px;margin:8px 0">${planSteps.map(s => `<li>${s}</li>`).join('')}</ul>
+    <button class="apply-btn" onclick='applyPromptPlan(${JSON.stringify(processedClips)})'>⚡ Apply Plan to Sequence</button>
+  `;
   $('resultsBody').prepend(c);
-  await logAI('prompt_edit', p, j);
+  await logAI('prompt_edit', rawPrompt, planSummary);
   setButtonLoading(btn, false);
 }
 
-async function applySuggestedOrder(btn, o) {
-  if (btn) btn.innerHTML = `<span class="spinner"></span> Applying…`;
-  await new Promise(r => setTimeout(r, 400));
-  const n = [];
-  o.forEach(name => { const c = timeline.find(x => x.name === name && !n.includes(x)); if (c) n.push(c); });
-  timeline.forEach(c => { if (!n.includes(c)) n.push(c); });
-  timeline = n;
+async function applyPromptPlan(newClips) {
+  timeline = newClips;
   renderTimeline();
-  saveProject(false);
-  if (btn) btn.innerHTML = `✓ Applied`;
-  toast('Sequence re-ordered');
+  await saveProject(true);
+  if (timeline.length > 0) {
+    previewMedia(timeline[0].mediaId);
+  }
+  toast('AI Edit Plan applied to timeline!');
 }
 
 async function runAutoTranscript() {
