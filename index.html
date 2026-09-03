@@ -68,7 +68,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: #332765; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; overflow: hidden; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-/* Left Panel */
+/* Left Sidebar */
 #left { grid-area: left; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
 .tabs { display: flex; border-bottom: 1px solid var(--border); }
 .tab { flex: 1; text-align: center; padding: 12px 4px; color: var(--text-muted); font-size: 11px; font-weight: 700; border-bottom: 2px solid transparent; }
@@ -106,8 +106,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 #right { grid-area: right; background: var(--bg-panel); border-left: 1px solid var(--border); padding: 14px; overflow-y: auto; }
 .result-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; font-size: 12px; line-height: 1.5; animation: fadeIn 0.2s ease; }
 .result-card h4 { color: #c8bcff; margin-bottom: 6px; }
-.apply-btn { border: 1px solid var(--accent); color: #c8bcff; border-radius: 6px; padding: 6px 10px; font-size: 11px; margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; }
-.apply-btn:hover { background: rgba(124, 92, 255, 0.15); }
 
 /* Bottom Panel (Timeline) */
 #bottom { grid-area: bottom; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
@@ -128,7 +126,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .trim-handle.right { right: 0; }
 .trim-handle:hover { background: rgba(124, 92, 255, 0.5); }
 
-/* Modal & Toast */
+/* Modal & Toast Controls */
 #toast { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; background: var(--bg-input); border: 1px solid var(--border); padding: 10px 18px; border-radius: 8px; font-size: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
 #renderModal { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; }
 .render-card { width: 420px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
@@ -329,7 +327,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         <div id="playheadLine"><div id="playheadHead"></div></div>
       </div>
       <div class="tl-track-label">Video Track</div>
-      <div class="tl-track" id="videoTrack" ondragover="event.preventDefault()" ondrop="timelineEngine.handleDrop(event)"></div>
+      <div class="tl-track" id="videoTrack"></div>
       <div class="tl-track-label">Subtitle Track</div>
       <div class="tl-track" id="textTrack"></div>
       <div class="tl-track-label">Audio Track</div>
@@ -424,21 +422,25 @@ const dbEngine = {
   },
   async load() {
     if (!state.db) return;
-    const mediaTx = state.db.transaction('media', 'readonly').objectStore('media').getAll();
-    mediaTx.onsuccess = () => {
-      state.media = mediaTx.result || [];
-      ui.renderMediaList();
-    };
-    const metaTx = state.db.transaction('meta', 'readonly').objectStore('meta').get('timeline');
-    metaTx.onsuccess = () => {
-      state.timeline = metaTx.result?.value || [];
-      timelineEngine.render();
-    };
+    try {
+      const mediaTx = state.db.transaction('media', 'readonly').objectStore('media').getAll();
+      mediaTx.onsuccess = () => {
+        state.media = mediaTx.result || [];
+        ui.renderMediaList();
+      };
+      const metaTx = state.db.transaction('meta', 'readonly').objectStore('meta').get('timeline');
+      metaTx.onsuccess = () => {
+        state.timeline = metaTx.result?.value || [];
+        timelineEngine.render();
+      };
+    } catch (e) {}
   },
   async save() {
     if (!state.db) return;
-    const tx = state.db.transaction('meta', 'readwrite').objectStore('meta');
-    tx.put({ key: 'timeline', value: state.timeline.map(c => ({ ...c, url: undefined })) });
+    try {
+      const tx = state.db.transaction('meta', 'readwrite').objectStore('meta');
+      tx.put({ key: 'timeline', value: state.timeline.map(c => ({ ...c, url: undefined })) });
+    } catch(e) {}
   }
 };
 
@@ -467,8 +469,10 @@ const appState = {
 const auth = {
   async init() {
     if (supabase) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) this.complete(session.user);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) this.complete(session.user);
+      } catch(e) { this.signInGuest(); }
     }
   },
   complete(user) {
@@ -484,14 +488,18 @@ const auth = {
   },
   async signInGoogle() {
     if (!supabase) return this.signInGuest();
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
+    try {
+      await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
+    } catch (e) { this.signInGuest(); }
   },
   async signInEmail() {
     const email = $('loginEmail').value.trim();
     if (!email) return this.signInGuest();
     if (supabase) {
-      await supabase.auth.signInWithOtp({ email });
-      toast('Magic link sent to email');
+      try {
+        await supabase.auth.signInWithOtp({ email });
+        toast('Magic link sent to email');
+      } catch(e) { this.signInGuest(); }
     }
   },
   signOut() {
@@ -553,7 +561,9 @@ const mediaManager = {
           const item = { id, name: file.name, url, duration: v.duration, thumb: c.toDataURL('image/jpeg', 0.6) };
           state.media.push(item);
           state.timeline.push({ id: 'c_' + id, mediaId: id, name: file.name, url, duration: v.duration, trimIn: 0, trimOut: v.duration });
-          if (state.db) state.db.transaction('media', 'readwrite').objectStore('media').put(item);
+          if (state.db) {
+            try { state.db.transaction('media', 'readwrite').objectStore('media').put(item); } catch(e){}
+          }
           ui.renderMediaList();
           timelineEngine.render();
           playback.preview(id);
@@ -565,7 +575,9 @@ const mediaManager = {
   remove(id) {
     state.media = state.media.filter(m => m.id !== id);
     state.timeline = state.timeline.filter(c => c.mediaId !== id);
-    if (state.db) state.db.transaction('media', 'readwrite').objectStore('media').delete(id);
+    if (state.db) {
+      try { state.db.transaction('media', 'readwrite').objectStore('media').delete(id); } catch(e){}
+    }
     ui.renderMediaList();
     timelineEngine.render();
     appState.save();
@@ -668,6 +680,12 @@ const timelineEngine = {
       acc += dur;
     }
     this.updatePlayhead(targetSec);
+  },
+  clear() {
+    state.timeline = [];
+    state.captions = [];
+    this.render();
+    appState.save();
   },
   removeClip(index) {
     state.timeline.splice(index, 1);
@@ -863,26 +881,30 @@ const aiEngine = {
 
       if (SpeechRec) {
         words = await new Promise(res => {
-          const rec = new SpeechRec();
-          rec.lang = lang;
-          rec.continuous = true;
-          let collected = [];
-          rec.onresult = e => {
-            for (let i = e.resultIndex; i < e.results.length; i++) {
-              if (e.results[i].isFinal) {
-                collected.push(...e.results[i][0].transcript.trim().split(/\s+/));
+          try {
+            const rec = new SpeechRec();
+            rec.lang = lang;
+            rec.continuous = true;
+            let collected = [];
+            
+            rec.onresult = e => {
+              for (let i = e.resultIndex; i < e.results.length; i++) {
+                if (e.results[i].isFinal) {
+                  collected.push(...e.results[i][0].transcript.trim().split(/\s+/));
+                }
               }
-            }
-          };
-          rec.onerror = () => res(collected);
-          rec.onend = () => res(collected);
-          
-          const v = document.createElement('video');
-          v.src = clip.url; v.muted = false;
-          v.currentTime = clip.trimIn;
-          rec.start();
-          v.play().catch(() => {});
-          setTimeout(() => { v.pause(); try { rec.stop(); } catch(e){} res(collected); }, Math.min(8000, dur * 1000));
+            };
+            rec.onerror = () => res(collected);
+            rec.onend = () => res(collected);
+            
+            const v = document.createElement('video');
+            v.src = clip.url; 
+            v.muted = true; // Muted to prevent audio locking crashes
+            v.currentTime = clip.trimIn;
+            rec.start();
+            v.play().catch(() => {});
+            setTimeout(() => { v.pause(); try { rec.stop(); } catch(e){} res(collected); }, Math.min(6000, dur * 1000));
+          } catch(err) { res([]); }
         });
       }
 
@@ -945,7 +967,13 @@ const renderEngine = {
 
     const fps = parseInt($('exportFps').value) || 30;
     const ctx = canvas.getContext('2d');
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Safely initialize Web Audio Context
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
     const dest = audioCtx.createMediaStreamDestination();
 
     const videoStream = canvas.captureStream(fps);
@@ -992,6 +1020,7 @@ const renderEngine = {
       v.src = clip.url; v.crossOrigin = 'anonymous'; v.muted = false; v.playsInline = true;
       await new Promise(res => { v.onloadedmetadata = res; v.load(); });
 
+      // Safe Web Audio Binding Logic
       try {
         const vSource = audioCtx.createMediaElementSource(v);
         vSource.connect(dest);
