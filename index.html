@@ -87,20 +87,34 @@ async function saveProject(show) {
 }
 
 async function completeLogin(u) {
-  if (user) return;
+  if (user) return; // Prevent double trigger
   user = u;
+
   const m = u.user_metadata || {};
   const name = m.full_name || m.name || u.email?.split('@')[0] || 'Guest';
   const pic = m.avatar_url || m.picture;
 
+  // 1. Immediately switch UI to display main application
   $('loginScreen').style.display = 'none';
   $('app').classList.add('active');
   $('avatarInit').innerHTML = pic ? `<img src="${esc(pic)}" referrerpolicy="no-referrer">` : esc(name[0]?.toUpperCase() || '?');
 
+  // 2. Perform DB operations safely in background
   try {
     await openDB();
     await loadLocal();
+  } catch (err) {
+    console.error('IndexedDB error:', err);
+  }
+
+  try {
     await syncProject();
+  } catch (err) {
+    console.warn('Supabase project sync error:', err);
+    $('syncState').textContent = 'Local';
+  }
+
+  try {
     if (supabaseClient) {
       await supabaseClient.from('profiles').upsert({
         id: u.id,
@@ -109,14 +123,16 @@ async function completeLogin(u) {
         updated_at: new Date().toISOString()
       });
     }
-  } catch (e) {
-    console.error(e);
-    $('syncState').textContent = 'Local';
+  } catch (err) {
+    console.warn('Profile sync error:', err);
   }
 }
 
 async function boot() {
-  if (!supabaseClient) return toast('Supabase library failed to load');
+  if (!supabaseClient) {
+    console.error('Supabase client failed to initialize.');
+    return toast('Supabase library failed to load');
+  }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session && session.user) {
@@ -128,9 +144,9 @@ async function boot() {
   });
 
   const { data: { session }, error } = await supabaseClient.auth.getSession();
-  if (error) console.error('Session retrieve error:', error);
+  if (error) console.error('Get session error:', error);
   if (session && session.user) {
-    await completeLogin(session.user);
+    completeLogin(session.user);
   }
 }
 
@@ -191,7 +207,7 @@ async function addMediaFile(file) {
       const obj = { id, name: file.name, url, duration: v.duration, thumb: c.toDataURL('image/jpeg', .65) };
       media.push(obj);
       timeline.push({ id: 'c_' + id, mediaId: id, name: file.name, url, duration: v.duration, trimIn: 0, trimOut: v.duration });
-      db.transaction('media', 'readwrite').objectStore('media').put(obj);
+      if (db) db.transaction('media', 'readwrite').objectStore('media').put(obj);
       renderMediaList();
       renderTimeline();
       previewMedia(id);
