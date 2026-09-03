@@ -16,3 +16,9 @@ const eslintConfig = defineConfig([
 ]);
 
 export default eslintConfig;
+"scripts": {
+  "dev": "next dev",
+  "build": "next build --no-lint",
+  "start": "next start",
+  "lint": "next lint"
+}
