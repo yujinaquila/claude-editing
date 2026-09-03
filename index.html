@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>ClipForge AI — Marketing Video Editor</title>
+<title>ClipForge AI — Pro Marketing Video Editor</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 body{margin:0;background:#0b0b0f;color:#f2f2f5;font:14px Inter,system-ui,sans-serif}
@@ -26,7 +26,7 @@ button:disabled{opacity:0.6;cursor:not-allowed}
 .btn-primary:hover{background:#6b46ff}
 .divider{display:flex;gap:10px;align-items:center;color:#62626d;font-size:11px;margin:18px 0}
 .divider:before,.divider:after{content:'';height:1px;background:#292930;flex:1}
-#app{display:none;height:100vh;grid-template-rows:52px 1fr 220px;grid-template-columns:280px minmax(0,1fr) 330px;grid-template-areas:'top top top' 'left center right' 'bottom bottom bottom'}
+#app{display:none;height:100vh;grid-template-rows:52px 1fr 240px;grid-template-columns:280px minmax(0,1fr) 330px;grid-template-areas:'top top top' 'left center right' 'bottom bottom bottom'}
 #app.active{display:grid}
 #topbar{grid-area:top;display:flex;align-items:center;justify-content:space-between;padding:0 15px;background:#15151a;border-bottom:1px solid #292930}
 .tb-left,.tb-right{display:flex;align-items:center;gap:10px}
@@ -52,7 +52,6 @@ button:disabled{opacity:0.6;cursor:not-allowed}
 .media-info{flex:1;min-width:0}
 .media-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .media-dur{font-size:10px;color:#62626d}
-.media-tag{font-size:9px;color:#c8bcff;background:#332765;padding:2px 5px;border-radius:4px}
 .media-remove{border:0;background:transparent;color:#ff5470;font-size:14px;padding:4px 6px;border-radius:4px;opacity:0.7}
 .media-remove:hover{opacity:1;background:#ff547022}
 .section-label{font-size:11px;color:#92929d;font-weight:700;margin:14px 0 8px}
@@ -69,8 +68,8 @@ button:disabled{opacity:0.6;cursor:not-allowed}
 @keyframes spin{to{transform:rotate(360deg)}}
 #center{grid-area:center;background:#050506;display:flex;flex-direction:column;position:relative}
 #previewWrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;background:#050508;overflow:hidden;padding:15px}
-.preview-container{position:relative;max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;border-radius:12px;overflow:hidden;box-shadow:0 20px 50px #000c;border:1px solid #1f1f28}
-#previewVideo{max-width:100%;max-height:70vh;border-radius:10px;display:block}
+.preview-container{position:relative;max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;border-radius:12px;overflow:hidden;box-shadow:0 20px 50px #000c;border:1px solid #1f1f28;background:#000}
+#previewCanvas{max-width:100%;max-height:65vh;border-radius:10px;display:block}
 .empty-preview{text-align:center;color:#62626d;padding:40px}
 .transport{display:flex;gap:12px;align-items:center;padding:10px 16px;background:#15151a;border-top:1px solid #292930}
 .tr-btn{width:34px;height:34px;border:1px solid #292930;background:#1b1b21;color:#fff;border-radius:8px;font-size:14px;display:flex;align-items:center;justify-content:center}
@@ -88,12 +87,12 @@ button:disabled{opacity:0.6;cursor:not-allowed}
 .tl-title{font-size:12px;font-weight:800}
 .tl-hint{font-size:10px;color:#62626d;margin-left:8px}
 .tl-track-label{font-size:10px;color:#92929d;margin-bottom:6px}
-.tl-track{display:flex;gap:4px;height:64px;min-width:100%}
-#tlScroll{padding:14px;overflow:auto}
-.tl-clip{height:64px;min-width:110px;position:relative;background:linear-gradient(#302c55,#22203c);border:1px solid #6659d9;border-radius:7px;display:flex;align-items:flex-end;overflow:hidden;transition:all 0.2s ease}
+.tl-track{display:flex;gap:4px;height:52px;min-width:100%}
+#tlScroll{padding:12px;overflow:auto;flex:1;position:relative}
+.tl-clip{height:52px;min-width:110px;position:relative;background:linear-gradient(#302c55,#22203c);border:1px solid #6659d9;border-radius:7px;display:flex;align-items:flex-end;overflow:hidden;transition:all 0.2s ease}
 .tl-clip-label{font-size:10px;font-weight:700;padding:4px 20px 4px 6px;background:#0009;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl-clip-dur{position:absolute;right:5px;top:4px;font-size:9px;color:#ddd}
-.tl-clip-del{position:absolute;right:4px;top:20px;border:0;background:#ff547033;color:#ff5470;font-size:10px;border-radius:3px;padding:1px 4px;z-index:5}
+.tl-clip-del{position:absolute;right:4px;top:18px;border:0;background:#ff547033;color:#ff5470;font-size:10px;border-radius:3px;padding:1px 4px;z-index:5}
 .tl-clip-del:hover{background:#ff5470;color:#fff}
 .trim-handle{position:absolute;top:0;bottom:0;width:8px;z-index:4}
 .trim-handle.left{left:0}
@@ -108,13 +107,14 @@ button:disabled{opacity:0.6;cursor:not-allowed}
 @media(max-width:760px){#app{grid-template-columns:1fr;grid-template-areas:'top' 'center' 'bottom'}#left{display:none}.tb-project{display:none}}
 </style></head><body>
 <div id="loginScreen"><div class="login-card"><div class="login-logo"><div class="login-mark"></div><div class="login-title">ClipForge AI</div></div><p class="login-sub">Edit marketing videos with a clean, AI-assisted workflow. Free in-browser video editor.</p><button class="btn-primary" id="googleSignInBtn" onclick="signInWithGoogle()">Continue with Google</button><div class="divider">or use email</div><div class="field"><label>Your name</label><input id="loginName" placeholder="e.g. Sam"></div><div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="you@example.com"></div><button class="btn-primary" id="loginBtn">Send magic link</button><button class="btn-ghost" style="width:100%;margin-top:10px" onclick="signInAsGuest()">⚡ Free Instant Access (Guest Mode)</button><div class="login-note">Authentication is handled by Supabase Auth. Imported video files stay in your browser; project/timeline metadata syncs locally.</div></div></div>
-<div id="app"><div id="topbar"><div class="tb-left"><div class="tb-logo"></div><div class="tb-name">ClipForge AI</div><div class="tb-project">Untitled marketing project</div></div><div class="tb-right"><button class="btn-ghost" onclick="triggerImport()">Import</button><button class="btn-ghost" onclick="saveProject(true)">Save</button><button class="btn-render" onclick="openRenderModal()">⤓ Render & Export</button><div class="avatar" id="avatarInit">?</div><button class="btn-ghost" onclick="signOut()">Sign out</button></div></div><div id="left"><div class="tabs"><div class="tab active" data-tab="media" onclick="switchTab('media')">Media</div><div class="tab" data-tab="ai" onclick="switchTab('ai')">AI Edit</div></div><div class="tab-body" id="tabMediaBody"><button class="import-btn" onclick="triggerImport()">＋ Import video clips</button><input type="file" id="fileInput" accept="video/*" multiple class="hidden"><div id="mediaList"></div></div><div class="tab-body hidden" id="tabAIBody"><div class="section-label">Prompt-based edit</div><div class="ai-box"><select id="tplSelect" onchange="applyTemplate()"><option value="">Custom prompt…</option><option value="hook">TikTok hook — punchy 3s intro</option><option value="reel">Instagram Reel — fast cuts</option><option value="highlights">Highlight reel</option><option value="captions">Bold caption suggestions</option><option value="silence">Tighten pacing</option></select><textarea id="promptInput" rows="4" placeholder="Describe the edit you want…"></textarea><button class="ai-run" id="btnPromptEdit" onclick="runPromptEdit()">Generate edit plan</button></div><div class="section-label">AI tools</div><div class="feature-grid"><button class="feature-btn" id="btnAutoTranscript" onclick="runAutoTranscript()"><div class="fb-title"><span class="dot"></span>Auto Transcript</div><div class="fb-sub">Create caption-ready timing notes</div></button><button class="feature-btn" id="btnAutoCut" onclick="runAutoCut()"><div class="fb-title"><span class="dot"></span>Auto Cut</div><div class="fb-sub">Detect and trim silent gaps</div></button><button class="feature-btn" id="btnAutoHook" onclick="runAutoHook()"><div class="fb-title"><span class="dot"></span>Auto Hook</div><div class="fb-sub">Pick a strong opening moment</div></button><button class="feature-btn" id="btnSceneChoose" onclick="runSceneChoose()"><div class="fb-title"><span class="dot"></span>Best Scenes</div><div class="fb-sub">Rank imported scenes</div></button></div></div></div><div id="center"><div id="previewWrap"><div class="preview-container"><video id="previewVideo" controls playsinline style="display:none"></video><div id="emptyPreview" class="empty-preview"><div style="font-size:38px">▶</div><div>Import a clip and click it to preview</div></div></div></div><canvas id="canvasRender" width="1080" height="1920" style="display:none"></canvas><div class="transport"><button class="tr-btn" onclick="playPause()">⏯</button><span class="tr-time mono" id="tlTime">00:00 / 00:00</span><span class="tr-time" style="margin-left:auto" id="sequenceInfo">0 clips in sequence</span></div></div><div id="right"><div class="panel-h">AI Results <span id="syncState" style="margin-left:auto;color:#62626d;font-size:10px;font-weight:500">Ready</span></div><div id="resultsBody"><div class="empty-right">Run an AI tool or edit prompt. Results and actions appear here.</div></div></div><div id="bottom"><div class="tl-head"><div><span class="tl-title">Sequence</span><span class="tl-hint">Drag clips to reorder · drag edges to trim</span></div><button class="btn-ghost" onclick="clearTimeline()">Clear Sequence</button></div><div id="tlScroll"><div class="tl-track-label">Video track</div><div class="tl-track" id="track"></div></div></div></div><div id="toast"></div><div id="renderModal"><div class="render-card"><div class="panel-h">Rendering Export</div><div id="renderStatus" style="font-size:12px;color:#92929d">Preparing video compositor…</div><div class="progress-bar"><div class="progress-fill" id="renderFill"></div></div><div id="renderNote" style="font-size:11px;color:#62626d">Processing frames directly in browser</div><button class="btn-ghost" id="renderCloseBtn" style="margin-top:16px;width:100%" onclick="closeRenderModal()">Cancel</button></div></div>
+<div id="app"><div id="topbar"><div class="tb-left"><div class="tb-logo"></div><div class="tb-name">ClipForge AI</div><div class="tb-project">Untitled marketing project</div></div><div class="tb-right"><button class="btn-ghost" onclick="triggerImport()">Import</button><button class="btn-ghost" onclick="saveProject(true)">Save</button><button class="btn-render" onclick="openRenderModal()">⤓ Render & Export</button><div class="avatar" id="avatarInit">?</div><button class="btn-ghost" onclick="signOut()">Sign out</button></div></div><div id="left"><div class="tabs"><div class="tab active" data-tab="media" onclick="switchTab('media')">Media</div><div class="tab" data-tab="text" onclick="switchTab('text')">Text</div><div class="tab" data-tab="ai" onclick="switchTab('ai')">AI Edit</div></div><div class="tab-body" id="tabMediaBody"><button class="import-btn" onclick="triggerImport()">＋ Import video clips</button><input type="file" id="fileInput" accept="video/*" multiple class="hidden"><div id="mediaList"></div></div><div class="tab-body hidden" id="tabTextBody"><div class="section-label">Overlay Captions & Titles</div><div class="field"><label>Caption Text</label><input id="overlayTextInput" placeholder="Enter headline or caption…"></div><button class="btn-primary" onclick="addTextOverlay()">＋ Add Text Track</button><div id="textOverlayList" style="margin-top:12px"></div></div><div class="tab-body hidden" id="tabAIBody"><div class="section-label">Prompt-based edit</div><div class="ai-box"><select id="tplSelect" onchange="applyTemplate()"><option value="">Custom prompt…</option><option value="hook">TikTok hook — punchy 3s intro</option><option value="reel">Instagram Reel — fast cuts</option><option value="highlights">Highlight reel</option><option value="captions">Bold caption suggestions</option><option value="silence">Tighten pacing</option></select><textarea id="promptInput" rows="4" placeholder="Describe the edit you want…"></textarea><button class="ai-run" id="btnPromptEdit" onclick="runPromptEdit()">Generate edit plan</button></div><div class="section-label">AI tools</div><div class="feature-grid"><button class="feature-btn" id="btnAutoTranscript" onclick="runAutoTranscript()"><div class="fb-title"><span class="dot"></span>Auto Transcript</div><div class="fb-sub">Create caption-ready timing notes</div></button><button class="feature-btn" id="btnAutoCut" onclick="runAutoCut()"><div class="fb-title"><span class="dot"></span>Auto Cut</div><div class="fb-sub">Detect and trim silent gaps</div></button><button class="feature-btn" id="btnAutoHook" onclick="runAutoHook()"><div class="fb-title"><span class="dot"></span>Auto Hook</div><div class="fb-sub">Pick a strong opening moment</div></button><button class="feature-btn" id="btnSceneChoose" onclick="runSceneChoose()"><div class="fb-title"><span class="dot"></span>Best Scenes</div><div class="fb-sub">Rank imported scenes</div></button></div></div></div><div id="center"><div id="previewWrap"><div class="preview-container"><canvas id="previewCanvas" width="1080" height="1920"></canvas><div id="emptyPreview" class="empty-preview"><div style="font-size:38px">▶</div><div>Import a clip and click it to preview</div></div></div></div><canvas id="canvasRender" width="1080" height="1920" style="display:none"></canvas><div class="transport"><button class="tr-btn" onclick="togglePlayPause()"><span id="playIcon">▶</span></button><select id="aspectRatioSelect" onchange="changeAspectRatio()" class="btn-ghost" style="padding:4px 8px"><option value="9:16">9:16 (TikTok / Reel)</option><option value="16:9">16:9 (YouTube)</option><option value="1:1">1:1 (Square)</option></select><span class="tr-time mono" id="tlTime">00:00 / 00:00</span><span class="tr-time" style="margin-left:auto" id="sequenceInfo">0 clips in sequence</span></div></div><div id="right"><div class="panel-h">AI Results <span id="syncState" style="margin-left:auto;color:#62626d;font-size:10px;font-weight:500">Ready</span></div><div id="resultsBody"><div class="empty-right">Run an AI tool or edit prompt. Results and actions appear here.</div></div></div><div id="bottom"><div class="tl-head"><div><span class="tl-title">Sequence</span><span class="tl-hint">Drag clips to reorder · drag edges to trim</span></div><button class="btn-ghost" onclick="clearTimeline()">Clear Sequence</button></div><div id="tlScroll"><div class="tl-track-label">Video track</div><div class="tl-track" id="track"></div><div class="tl-track-label" style="margin-top:10px">Text overlay track</div><div class="tl-track" id="textTrack"></div></div></div></div><div id="toast"></div><div id="renderModal"><div class="render-card"><div class="panel-h">Rendering Export</div><div id="renderStatus" style="font-size:12px;color:#92929d">Preparing video compositor…</div><div class="progress-bar"><div class="progress-fill" id="renderFill"></div></div><div id="renderNote" style="font-size:11px;color:#62626d">Processing frames directly in browser</div><button class="btn-ghost" id="renderCloseBtn" style="margin-top:16px;width:100%" onclick="closeRenderModal()">Cancel</button></div></div>
 <script>
 const SUPABASE_URL = 'https://attrgssmemtipoingkpe.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_zRqpbpSxI3JDYAv4wnqajA_RJfLNcIX';
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
 
-let user = null, media = [], timeline = [], db = null, cloudProjectId = null, dragMediaId = null, dragClipIdx = null, activeRecorder = null;
+let user = null, media = [], timeline = [], textOverlays = [], db = null, cloudProjectId = null, dragMediaId = null, dragClipIdx = null, activeRecorder = null;
+let isPlaying = false, currentTime = 0, totalSequenceDuration = 0, previewAnimId = null, loadedVideoElements = {};
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -297,6 +297,7 @@ $('loginBtn').onclick = async () => {
 function switchTab(t) {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === t));
   $('tabMediaBody').classList.toggle('hidden', t !== 'media');
+  $('tabTextBody').classList.toggle('hidden', t !== 'text');
   $('tabAIBody').classList.toggle('hidden', t !== 'ai');
 }
 
@@ -325,7 +326,6 @@ async function addMediaFile(file) {
       if (db) db.transaction('media', 'readwrite').objectStore('media').put(obj);
       renderMediaList();
       renderTimeline();
-      previewMedia(id);
       await saveProject(false);
     };
   };
@@ -342,11 +342,6 @@ function deleteMediaItem(e, id) {
   }
   renderMediaList();
   renderTimeline();
-  if (media.length) previewMedia(media[0].id);
-  else {
-    $('previewVideo').style.display = 'none';
-    $('emptyPreview').style.display = 'block';
-  }
   saveProject(false);
   toast('Media removed');
 }
@@ -371,13 +366,128 @@ function renderMediaList() {
     </div>`).join('') || '<div style="color:#62626d;font-size:11px;padding:12px">No clips imported yet. Click Import above.</div>';
 }
 
+function changeAspectRatio() {
+  const ratio = $('aspectRatioSelect').value;
+  const canvas = $('previewCanvas');
+  if (ratio === '9:16') { canvas.width = 1080; canvas.height = 1920; }
+  else if (ratio === '16:9') { canvas.width = 1920; canvas.height = 1080; }
+  else if (ratio === '1:1') { canvas.width = 1080; canvas.height = 1080; }
+  renderPreviewFrame();
+}
+
+function addTextOverlay() {
+  const val = $('overlayTextInput').value.trim();
+  if (!val) return toast('Enter text to add');
+  textOverlays.push({ id: 't_' + Date.now(), text: val, startTime: 0, duration: Math.max(3, totalSequenceDuration || 3) });
+  $('overlayTextInput').value = '';
+  renderTextOverlayList();
+  renderTimeline();
+  renderPreviewFrame();
+}
+
+function renderTextOverlayList() {
+  $('textOverlayList').innerHTML = textOverlays.map((t, idx) => `
+    <div class="media-item">
+      <div class="media-info">
+        <div class="media-name">"${esc(t.text)}"</div>
+        <div class="media-dur">${fmt(t.startTime)} - ${fmt(t.startTime + t.duration)}</div>
+      </div>
+      <button class="media-remove" onclick="textOverlays.splice(${idx},1);renderTextOverlayList();renderTimeline();renderPreviewFrame();">✕</button>
+    </div>`).join('');
+}
+
+function togglePlayPause() {
+  if (!timeline.length) return toast('Add clips to the sequence first');
+  isPlaying = !isPlaying;
+  $('playIcon').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) {
+    if (currentTime >= totalSequenceDuration) currentTime = 0;
+    playLoop();
+  } else {
+    cancelAnimationFrame(previewAnimId);
+  }
+}
+
+let lastFrameTime = performance.now();
+function playLoop() {
+  const now = performance.now();
+  const delta = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+
+  if (isPlaying) {
+    currentTime += delta;
+    if (currentTime >= totalSequenceDuration) {
+      currentTime = 0;
+    }
+    renderPreviewFrame();
+    previewAnimId = requestAnimationFrame(playLoop);
+  }
+}
+
+function renderPreviewFrame() {
+  const canvas = $('previewCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#050508';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (!timeline.length) {
+    $('emptyPreview').style.display = 'block';
+    return;
+  }
+  $('emptyPreview').style.display = 'none';
+
+  let accumulator = 0;
+  let activeClip = null;
+  let clipTimeOffset = 0;
+
+  for (let c of timeline) {
+    const clipDur = c.trimOut - c.trimIn;
+    if (currentTime >= accumulator && currentTime < accumulator + clipDur) {
+      activeClip = c;
+      clipTimeOffset = c.trimIn + (currentTime - accumulator);
+      break;
+    }
+    accumulator += clipDur;
+  }
+
+  if (activeClip) {
+    let v = loadedVideoElements[activeClip.mediaId];
+    if (!v) {
+      v = document.createElement('video');
+      v.src = activeClip.url;
+      v.muted = true;
+      v.playsInline = true;
+      loadedVideoElements[activeClip.mediaId] = v;
+    }
+
+    if (Math.abs(v.currentTime - clipTimeOffset) > 0.15) {
+      v.currentTime = clipTimeOffset;
+    }
+
+    const s = Math.min(canvas.width / (v.videoWidth || 16), canvas.height / (v.videoHeight || 9));
+    const w = (v.videoWidth || 16) * s, h = (v.videoHeight || 9) * s;
+    ctx.drawImage(v, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  }
+
+  for (let t of textOverlays) {
+    if (currentTime >= t.startTime && currentTime <= t.startTime + t.duration) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold ' + Math.floor(canvas.height * 0.05) + 'px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 10;
+      ctx.fillText(t.text, canvas.width / 2, canvas.height * 0.85);
+    }
+  }
+
+  $('tlTime').textContent = `${fmt(currentTime)} / ${fmt(totalSequenceDuration)}`;
+}
+
 function previewMedia(id) {
   const m = media.find(x => x.id === id);
   if (!m) return;
-  const p = $('previewVideo');
-  p.src = m.url;
-  p.style.display = 'block';
-  $('emptyPreview').style.display = 'none';
+  currentTime = 0;
+  renderPreviewFrame();
 }
 
 $('track').ondragover = e => e.preventDefault();
@@ -391,6 +501,8 @@ $('track').ondrop = e => {
 };
 
 function renderTimeline() {
+  totalSequenceDuration = timeline.reduce((sum, c) => sum + (c.trimOut - c.trimIn), 0);
+
   $('track').innerHTML = timeline.map((c, i) => `
     <div class="tl-clip" style="width:${Math.max(110, (c.trimOut - c.trimIn) * 28)}px" draggable="true" ondragstart="dragClipIdx=${i}" ondragover="event.preventDefault()" ondrop="dropClip(${i})">
       <span class="tl-clip-dur">${fmt(c.trimOut - c.trimIn)}</span>
@@ -399,7 +511,15 @@ function renderTimeline() {
       <div class="trim-handle right" onmousedown="startTrim(event,${i},'right')"></div>
       <div class="tl-clip-label">${esc(c.name)}</div>
     </div>`).join('') || '<div style="color:#62626d;font-size:11px">Drag clips here from Media tab or click Import.</div>';
+
+  $('textTrack').innerHTML = textOverlays.map((t, i) => `
+    <div class="tl-clip" style="width:${Math.max(110, t.duration * 28)}px;background:linear-gradient(#4d286e,#28153c);border-color:#a855f7">
+      <span class="tl-clip-dur">${fmt(t.duration)}</span>
+      <div class="tl-clip-label">${esc(t.text)}</div>
+    </div>`).join('') || '<div style="color:#62626d;font-size:11px">Add captions in Text tab.</div>';
+
   $('sequenceInfo').textContent = `${timeline.length} clip${timeline.length === 1 ? '' : 's'} in sequence`;
+  renderPreviewFrame();
 }
 
 function dropClip(i) {
@@ -431,8 +551,6 @@ function startTrim(e, i, side) {
 }
 
 function clearTimeline() { timeline = []; renderTimeline(); saveProject(false); toast('Sequence cleared'); }
-function playPause() { const v = $('previewVideo'); v.paused ? v.play() : v.pause(); }
-$('previewVideo').ontimeupdate = e => $('tlTime').textContent = `${fmt(e.target.currentTime)} / ${fmt(e.target.duration)}`;
 
 function applyTemplate() {
   const m = { hook: 'Make a punchy 3-second hook from the strongest clip.', reel: 'Create a fast Reel with cuts on the beat.', highlights: 'Build a highlight reel from the best moments.', captions: 'Suggest bold short captions for each clip.', silence: 'Tighten pacing by removing dead air.' };
@@ -589,6 +707,14 @@ function startRender() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const s = Math.min(canvas.width / v.videoWidth, canvas.height / v.videoHeight), w = v.videoWidth * s, h = v.videoHeight * s;
       ctx.drawImage(v, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+      
+      for (let t of textOverlays) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold ' + Math.floor(canvas.height * 0.05) + 'px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.text, canvas.width / 2, canvas.height * 0.85);
+      }
+      
       requestAnimationFrame(draw);
     }
     v.load();
