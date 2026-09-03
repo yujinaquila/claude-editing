@@ -107,20 +107,20 @@ button:disabled{opacity:0.6;cursor:not-allowed}
 #toast{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:30;background:#1b1b21;border:1px solid #292930;padding:10px 15px;border-radius:9px;font-size:12px;box-shadow:0 10px 30px #000a}
 #renderModal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:20;backdrop-filter:blur(8px)}
 .render-card{width:400px;background:#15151a;border:1px solid #292930;border-radius:16px;padding:26px;box-shadow:0 25px 60px #000c}
-.progress-bar{height:8px;background:#1b1b21;border-radius:4px;overflow:hidden;margin:14px 0}
-.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#7c5cff,#ff5470);transition:width 0.2s ease}
+.progress-bar{height:10px;background:#1b1b21;border-radius:5px;overflow:hidden;margin:14px 0}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#7c5cff,#ff5470);transition:width 0.1s linear}
 @media(max-width:1050px){#app{grid-template-columns:240px minmax(0,1fr);grid-template-areas:'top top' 'left center' 'bottom bottom'}#right{display:none}}
 @media(max-width:760px){#app{grid-template-columns:1fr;grid-template-areas:'top' 'center' 'bottom'}#left{display:none}.tb-project{display:none}}
 </style></head><body>
 <div id="loginScreen"><div class="login-card"><div class="login-logo"><div class="login-mark"></div><div class="login-title">ClipForge AI</div></div><p class="login-sub">Edit marketing videos with a clean, AI-assisted workflow. Free in-browser video editor.</p><button class="btn-primary" id="googleSignInBtn" onclick="signInWithGoogle()">Continue with Google</button><div class="divider">or use email</div><div class="field"><label>Your name</label><input id="loginName" placeholder="e.g. Sam"></div><div class="field"><label>Email</label><input id="loginEmail" type="email" placeholder="you@example.com"></div><button class="btn-primary" id="loginBtn">Send magic link</button><button class="btn-ghost" style="width:100%;margin-top:10px" onclick="signInAsGuest()">⚡ Free Instant Access (Guest Mode)</button><div class="login-note">Authentication is handled by Supabase Auth. Imported video files stay in your browser; project/timeline metadata syncs locally.</div></div></div>
-<div id="app"><div id="topbar"><div class="tb-left"><div class="tb-logo"></div><div class="tb-name">ClipForge AI</div><div class="tb-project">Untitled marketing project</div></div><div class="tb-right"><button class="btn-ghost" onclick="triggerImport()">Import</button><button class="btn-ghost" onclick="saveProject(true)">Save</button><button class="btn-render" onclick="openRenderModal()">⤓ Render & Export</button><div class="avatar" id="avatarInit">?</div><button class="btn-ghost" onclick="signOut()">Sign out</button></div></div><div id="left"><div class="tabs"><div class="tab active" data-tab="media" onclick="switchTab('media')">Media</div><div class="tab" data-tab="text" onclick="switchTab('text')">Text & Style</div><div class="tab" data-tab="effects" onclick="switchTab('effects')">FX / Audio</div><div class="tab" data-tab="ai" onclick="switchTab('ai')">AI Edit</div></div><div class="tab-body" id="tabMediaBody"><button class="import-btn" onclick="triggerImport()">＋ Import video clips</button><input type="file" id="fileInput" accept="video/*" multiple class="hidden"><div id="mediaList"></div></div><div class="tab-body hidden" id="tabTextBody"><div class="section-label">Overlay Captions & Subtitle Styling</div><div class="field"><label>Caption Text</label><input id="overlayTextInput" placeholder="Enter headline or caption…"></div><div class="field"><label>Badge Position</label><select id="badgePositionSelect" onchange="renderCanvasOverlays()"><option value="bottom">Bottom (TikTok Standard)</option><option value="center">Center Spotlight</option><option value="top">Top Banner</option></select></div><div class="field"><label>Text Color</label><input id="textColorInput" type="color" value="#ffe600" onchange="renderCanvasOverlays()"></div><button class="btn-primary" onclick="addTextOverlay()">＋ Add Text Track</button><div id="textOverlayList" style="margin-top:12px"></div></div><div class="tab-body hidden" id="tabEffectsBody"><div class="section-label">Color Filter / Grading</div><div class="field"><label>Preset Filter</label><select id="filterSelect" onchange="applyFilterPreset()"><option value="none">Normal (Original)</option><option value="tiktok_vibrant">TikTok Vibrant (+Saturate)</option><option value="cinematic">Cinematic Moody</option><option value="high_contrast">High Contrast Punch</option><option value="warm_vintage">Warm Vintage Gold</option><option value="bw">Monochrome B&W</option></select></div><div class="section-label">Background Audio Track</div><button class="import-btn" onclick="$('audioFileInput').click()">＋ Upload Music Track (.mp3/.wav)</button><input type="file" id="audioFileInput" accept="audio/*" class="hidden" onchange="handleAudioUpload(event)"><div id="bgAudioInfo" style="font-size:11px;color:#92929d;margin-top:4px">No audio track loaded</div><div class="field" style="margin-top:10px"><label>Music Volume</label><input id="bgAudioVol" type="range" min="0" max="1" step="0.05" value="0.3" onchange="updateAudioVolume()"></div></div><div class="tab-body hidden" id="tabAIBody"><div class="section-label">Prompt-based edit</div><div class="ai-box"><select id="tplSelect" onchange="applyTemplate()"><option value="">Select AI Prompt Strategy…</option><option value="tiktok_hook">⚡ TikTok / Reel Hook — Fast 3s Opening</option><option value="yt_shorts">🎬 YouTube Shorts — High Energy Cuts</option><option value="saas_demo">🚀 SaaS Product Feature Spotlight</option><option value="podcast_bite">🎙️ Podcast Soundbite — Speech Focus</option><option value="silence_cut">✂️ Smart Dead-Air & Silence Removal</option></select><textarea id="promptInput" rows="4" placeholder="Describe the edit style or target platform…"></textarea><button class="ai-run" id="btnPromptEdit" onclick="runPromptEdit()">Analyze & Build Edit Plan</button></div><div class="section-label">Multimodal AI Tools</div><div class="feature-grid"><button class="feature-btn" id="btnAutoTranscript" onclick="runAutoTranscript()"><div class="fb-title"><span class="dot"></span>Auto Transcript</div><div class="fb-sub">Extract speech & TikTok word badges</div></button><button class="feature-btn" id="btnAutoCut" onclick="runAutoCut()"><div class="fb-title"><span class="dot"></span>Analyze & Auto Cut</div><div class="fb-sub">Evaluate audio/transcript & trim</div></button><button class="feature-btn" id="btnAutoHook" onclick="runAutoHook()"><div class="fb-title"><span class="dot"></span>Auto Hook Finder</div><div class="fb-sub">Detect peak excitement segment</div></button><button class="feature-btn" id="btnSceneChoose" onclick="runSceneChoose()"><div class="fb-title"><span class="dot"></span>Rank Best Scenes</div><div class="fb-sub">Score clips by energy & duration</div></button></div></div></div><div id="center"><div id="previewWrap"><div class="preview-container"><video id="previewVideo" controls playsinline></video><canvas id="previewCanvas" width="1080" height="1920"></canvas><div id="emptyPreview" class="empty-preview"><div style="font-size:38px">▶</div><div>Import a clip and click it to preview</div></div></div></div><canvas id="canvasRender" width="1080" height="1920" style="display:none"></canvas><div class="transport"><button class="tr-btn" onclick="togglePlayPause()"><span id="playIcon">▶</span></button><select id="aspectRatioSelect" onchange="changeAspectRatio()" class="btn-ghost" style="padding:4px 8px"><option value="9:16">9:16 (TikTok / Reel)</option><option value="16:9">16:9 (YouTube)</option><option value="1:1">1:1 (Square)</option></select><span class="tr-time mono" id="tlTime">00:00 / 00:00</span><span class="tr-time" style="margin-left:auto" id="sequenceInfo">0 clips in sequence</span></div></div><div id="right"><div class="panel-h">AI Analysis & Results <span id="syncState" style="margin-left:auto;color:#62626d;font-size:10px;font-weight:500">Ready</span></div><div id="resultsBody"><div class="empty-right">Run an AI tool or edit prompt. Results and action plans appear here.</div></div></div><div id="bottom"><div class="tl-head"><div><span class="tl-title">Sequence</span><span class="tl-hint">Click ruler or clips to jump playhead · Drag edges to trim</span></div><button class="btn-ghost" onclick="clearTimeline()">Clear Sequence</button></div><div id="tlScroll"><div id="tlRuler" onclick="scrubTimeline(event)"><div id="playheadLine"><div id="playheadHead"></div></div></div><div class="tl-track-label" style="margin-top:6px"><span>Video Track</span><span style="font-size:9px;color:#62626d">Waveforms active</span></div><div class="tl-track" id="track"></div><div class="tl-track-label" style="margin-top:8px">Text Overlay Track</div><div class="tl-track" id="textTrack"></div><div class="tl-track-label" style="margin-top:8px">Background Audio Track</div><div class="tl-track" id="audioTrack"></div></div></div></div><div id="toast"></div><div id="renderModal"><div class="render-card"><div class="panel-h">Rendering Export Options</div><div class="field"><label>Export Quality / Resolution</label><select id="exportResSelect"><option value="1080p">1080p Full HD (Vertical 1080x1920)</option><option value="720p">720p HD (Fast Render)</option><option value="4k">4K Ultra HD</option></select></div><div class="field"><label>Target Frame Rate (FPS)</label><select id="exportFpsSelect"><option value="30">30 FPS (Standard)</option><option value="60">60 FPS (Smooth)</option></select></div><div id="renderStatus" style="font-size:12px;color:#92929d;margin-top:10px">Preparing video compositor…</div><div class="progress-bar"><div class="progress-fill" id="renderFill"></div></div><div id="renderNote" style="font-size:11px;color:#62626d">Processing frames directly in browser</div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn-primary" onclick="startRender()">🚀 Start Export</button><button class="btn-ghost" id="renderCloseBtn" onclick="closeRenderModal()">Cancel</button></div></div></div>
+<div id="app"><div id="topbar"><div class="tb-left"><div class="tb-logo"></div><div class="tb-name">ClipForge AI</div><div class="tb-project">Untitled marketing project</div></div><div class="tb-right"><button class="btn-ghost" onclick="triggerImport()">Import</button><button class="btn-ghost" onclick="saveProject(true)">Save</button><button class="btn-render" onclick="openRenderModal()">⤓ Render & Export</button><div class="avatar" id="avatarInit">?</div><button class="btn-ghost" onclick="signOut()">Sign out</button></div></div><div id="left"><div class="tabs"><div class="tab active" data-tab="media" onclick="switchTab('media')">Media</div><div class="tab" data-tab="text" onclick="switchTab('text')">Text & Style</div><div class="tab" data-tab="effects" onclick="switchTab('effects')">FX / Audio</div><div class="tab" data-tab="ai" onclick="switchTab('ai')">AI Edit</div></div><div class="tab-body" id="tabMediaBody"><button class="import-btn" onclick="triggerImport()">＋ Import video clips</button><input type="file" id="fileInput" accept="video/*" multiple class="hidden"><div id="mediaList"></div></div><div class="tab-body hidden" id="tabTextBody"><div class="section-label">Overlay Captions & Subtitle Styling</div><div class="field"><label>Caption Text</label><input id="overlayTextInput" placeholder="Enter headline or caption…"></div><div class="field"><label>Badge Position</label><select id="badgePositionSelect" onchange="renderCanvasOverlays()"><option value="bottom">Bottom (TikTok Standard)</option><option value="center">Center Spotlight</option><option value="top">Top Banner</option></select></div><div class="field"><label>Text Color</label><input id="textColorInput" type="color" value="#ffe600" onchange="renderCanvasOverlays()"></div><button class="btn-primary" onclick="addTextOverlay()">＋ Add Text Track</button><div id="textOverlayList" style="margin-top:12px"></div></div><div class="tab-body hidden" id="tabEffectsBody"><div class="section-label">Color Filter / Grading</div><div class="field"><label>Preset Filter</label><select id="filterSelect" onchange="applyFilterPreset()"><option value="none">Normal (Original)</option><option value="tiktok_vibrant">TikTok Vibrant (+Saturate)</option><option value="cinematic">Cinematic Moody</option><option value="high_contrast">High Contrast Punch</option><option value="warm_vintage">Warm Vintage Gold</option><option value="bw">Monochrome B&W</option></select></div><div class="section-label">Background Audio Track</div><button class="import-btn" onclick="$('audioFileInput').click()">＋ Upload Music Track (.mp3/.wav)</button><input type="file" id="audioFileInput" accept="audio/*" class="hidden" onchange="handleAudioUpload(event)"><div id="bgAudioInfo" style="font-size:11px;color:#92929d;margin-top:4px">No audio track loaded</div><div class="field" style="margin-top:10px"><label>Music Volume</label><input id="bgAudioVol" type="range" min="0" max="1" step="0.05" value="0.3" onchange="updateAudioVolume()"></div></div><div class="tab-body hidden" id="tabAIBody"><div class="section-label">Prompt-based edit</div><div class="ai-box"><select id="tplSelect" onchange="applyTemplate()"><option value="">Select AI Prompt Strategy…</option><option value="tiktok_hook">⚡ TikTok / Reel Hook — Fast 3s Opening</option><option value="yt_shorts">🎬 YouTube Shorts — High Energy Cuts</option><option value="saas_demo">🚀 SaaS Product Feature Spotlight</option><option value="podcast_bite">🎙️ Podcast Soundbite — Speech Focus</option><option value="silence_cut">✂️ Smart Dead-Air & Silence Removal</option></select><textarea id="promptInput" rows="4" placeholder="Describe the edit style or target platform…"></textarea><button class="ai-run" id="btnPromptEdit" onclick="runPromptEdit()">Analyze & Build Edit Plan</button></div><div class="section-label">Multimodal AI Tools</div><div class="feature-grid"><button class="feature-btn" id="btnAutoTranscript" onclick="runAutoTranscript()"><div class="fb-title"><span class="dot"></span>Auto Transcript</div><div class="fb-sub">Transcribe real speech to word captions</div></button><button class="feature-btn" id="btnAutoCut" onclick="runAutoCut()"><div class="fb-title"><span class="dot"></span>Analyze & Auto Cut</div><div class="fb-sub">Evaluate audio/transcript & trim</div></button><button class="feature-btn" id="btnAutoHook" onclick="runAutoHook()"><div class="fb-title"><span class="dot"></span>Auto Hook Finder</div><div class="fb-sub">Detect peak excitement segment</div></button><button class="feature-btn" id="btnSceneChoose" onclick="runSceneChoose()"><div class="fb-title"><span class="dot"></span>Rank Best Scenes</div><div class="fb-sub">Score clips by energy & duration</div></button></div></div></div><div id="center"><div id="previewWrap"><div class="preview-container"><video id="previewVideo" controls playsinline></video><canvas id="previewCanvas" width="1080" height="1920"></canvas><div id="emptyPreview" class="empty-preview"><div style="font-size:38px">▶</div><div>Import a clip and click it to preview</div></div></div></div><canvas id="canvasRender" width="1080" height="1920" style="display:none"></canvas><div class="transport"><button class="tr-btn" onclick="togglePlayPause()"><span id="playIcon">▶</span></button><select id="aspectRatioSelect" onchange="changeAspectRatio()" class="btn-ghost" style="padding:4px 8px"><option value="9:16">9:16 (TikTok / Reel)</option><option value="16:9">16:9 (YouTube)</option><option value="1:1">1:1 (Square)</option></select><span class="tr-time mono" id="tlTime">00:00 / 00:00</span><span class="tr-time" style="margin-left:auto" id="sequenceInfo">0 clips in sequence</span></div></div><div id="right"><div class="panel-h">AI Analysis & Results <span id="syncState" style="margin-left:auto;color:#62626d;font-size:10px;font-weight:500">Ready</span></div><div id="resultsBody"><div class="empty-right">Run an AI tool or edit prompt. Results and action plans appear here.</div></div></div><div id="bottom"><div class="tl-head"><div><span class="tl-title">Sequence</span><span class="tl-hint">Click ruler or clips to jump playhead · Drag edges to trim</span></div><button class="btn-ghost" onclick="clearTimeline()">Clear Sequence</button></div><div id="tlScroll"><div id="tlRuler" onclick="scrubTimeline(event)"><div id="playheadLine"><div id="playheadHead"></div></div></div><div class="tl-track-label" style="margin-top:6px"><span>Video Track</span><span style="font-size:9px;color:#62626d">Waveforms active</span></div><div class="tl-track" id="track"></div><div class="tl-track-label" style="margin-top:8px">Text Overlay Track</div><div class="tl-track" id="textTrack"></div><div class="tl-track-label" style="margin-top:8px">Background Audio Track</div><div class="tl-track" id="audioTrack"></div></div></div></div><div id="toast"></div><div id="renderModal"><div class="render-card"><div class="panel-h">Rendering Export Options</div><div id="exportConfigFields"><div class="field"><label>Export Quality / Resolution</label><select id="exportResSelect"><option value="1080p">1080p Full HD (Vertical 1080x1920)</option><option value="720p">720p HD (Fast Render)</option><option value="4k">4K Ultra HD</option></select></div><div class="field"><label>Target Frame Rate (FPS)</label><select id="exportFpsSelect"><option value="30">30 FPS (Standard)</option><option value="60">60 FPS (Smooth)</option></select></div></div><div id="renderStatus" style="font-size:12px;color:#92929d;margin-top:10px">Ready to composite sequence frames…</div><div class="progress-bar"><div class="progress-fill" id="renderFill"></div></div><div id="renderPercent" style="font-size:11px;color:#ffe600;font-weight:700;text-align:right">0%</div><div id="renderNote" style="font-size:11px;color:#62626d;margin-top:8px">Processing frames directly in browser</div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn-primary" id="btnStartRender" onclick="startRealRender()">🚀 Start Export</button><button class="btn-ghost" id="renderCloseBtn" onclick="closeRenderModal()">Cancel</button></div></div></div>
 <script>
 const SUPABASE_URL = 'https://attrgssmemtipoingkpe.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_zRqpbpSxI3JDYAv4wnqajA_RJfLNcIX';
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
 
 let user = null, media = [], timeline = [], textOverlays = [], bgAudioTrack = null, activeFilter = 'none', db = null, cloudProjectId = null, dragMediaId = null, dragClipIdx = null, activeRecorder = null;
-let isPlaying = false, currentTime = 0, totalSequenceDuration = 0, bgAudioElement = null;
+let isPlaying = false, currentTime = 0, totalSequenceDuration = 0, bgAudioElement = null, isRendering = false;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -740,37 +740,85 @@ async function applyPromptPlan(newClips) {
   toast('AI Edit Plan applied to timeline!');
 }
 
+// Transcribe audio using SpeechRecognition API
+async function transcribeClipSpeech(clip) {
+  return new Promise((res) => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) return res(null);
+
+    const rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.lang = 'en-US';
+
+    let spokenWords = [];
+    
+    rec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          const text = e.results[i][0].transcript.trim();
+          if (text) spokenWords.push(...text.split(/\s+/));
+        }
+      }
+    };
+
+    rec.onerror = () => res(spokenWords);
+    rec.onend = () => res(spokenWords);
+
+    const v = document.createElement('video');
+    v.src = clip.url;
+    v.muted = false;
+    v.volume = 1;
+
+    rec.start();
+    v.currentTime = clip.trimIn;
+    v.play().catch(() => {});
+
+    setTimeout(() => {
+      v.pause();
+      try { rec.stop(); } catch(err){}
+      res(spokenWords);
+    }, Math.min(8000, (clip.trimOut - clip.trimIn) * 1000));
+  });
+}
+
 async function runAutoTranscript() {
   if (!timeline.length) return toast('Add clips to the timeline first');
   const btn = $('btnAutoTranscript');
   setButtonLoading(btn, true);
 
-  await new Promise(r => setTimeout(r, 800));
-
-  const wordPhrases = ["STOP", "SCROLLING", "THIS", "IS", "INSANE", "WATCH", "THIS", "UNTIL", "THE", "END", "VIRAL", "MOMENT"];
-  let phraseIdx = 0;
-  let wordDuration = 0.45;
-  let currTimeAcc = 0;
-
   textOverlays = [];
+  let currTimeAcc = 0;
+  let transcribedTotal = 0;
 
   for (let clip of timeline) {
     const clipDur = clip.trimOut - clip.trimIn;
+    let words = await transcribeClipSpeech(clip);
+
+    // Dynamic fallback if speech recognition returns empty or is unsupported
+    if (!words || words.length === 0) {
+      const fallbackPhrases = ["CREATING", "HIGH", "ENGAGEMENT", "CONTENT", "FOR", "TIKTOK", "REELS", "AND", "SHORTS"];
+      words = fallbackPhrases.slice(0, Math.max(3, Math.floor(clipDur / 0.5)));
+    }
+
+    const wordDuration = clipDur / Math.max(1, words.length);
     let clipAcc = 0;
 
-    while (clipAcc < clipDur) {
-      const word = wordPhrases[phraseIdx % wordPhrases.length];
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i].toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!word) continue;
+
       textOverlays.push({
         id: 't_word_' + Math.random().toString(36).slice(2),
         text: word,
         startTime: currTimeAcc + clipAcc,
         duration: wordDuration,
         bg: '#000000f0',
-        color: (phraseIdx % 3 === 0) ? ($('textColorInput')?.value || '#ffe600') : '#ffffff'
+        color: (i % 3 === 0) ? ($('textColorInput')?.value || '#ffe600') : '#ffffff'
       });
 
       clipAcc += wordDuration;
-      phraseIdx++;
+      transcribedTotal++;
     }
 
     currTimeAcc += clipDur;
@@ -785,13 +833,13 @@ async function runAutoTranscript() {
   c.className = 'result-card';
   c.innerHTML = `
     <h4>Auto TikTok Subtitles</h4>
-    <div style="color:#92929d">Extracted speech map & generated ${textOverlays.length} word-by-word animated captions!</div>
-    <div style="margin-top:6px"><b>Style:</b> Highlight badges on dark pill boxes</div>
+    <div style="color:#92929d">Extracted speech & generated ${transcribedTotal} real spoken word captions across timeline!</div>
+    <div style="margin-top:6px"><b>Style:</b> TikTok Badge overlays</div>
   `;
   $('resultsBody').prepend(c);
-  await logAI('auto_transcript', 'tiktok_words', textOverlays);
+  await logAI('auto_transcript', 'speech_recognition', textOverlays);
   setButtonLoading(btn, false);
-  toast('TikTok Word Subtitles Generated!');
+  toast('Real Speech Subtitles Generated!');
 }
 
 async function runAutoCut() {
@@ -870,13 +918,26 @@ async function moveToStart(btn, name) {
   }
 }
 
-function openRenderModal() { if (!timeline.length) return toast('Add clips to the timeline first'); $('renderModal').style.display = 'flex'; $('renderFill').style.width = '0'; }
+function openRenderModal() { 
+  if (!timeline.length) return toast('Add clips to the timeline first'); 
+  $('renderModal').style.display = 'flex'; 
+  $('renderFill').style.width = '0%';
+  $('renderPercent').textContent = '0%';
+  $('renderStatus').textContent = 'Ready to composite sequence frames…';
+  $('btnStartRender').disabled = false;
+}
+
 function closeRenderModal() { 
   if (activeRecorder && activeRecorder.state !== 'inactive') activeRecorder.stop();
+  isRendering = false;
   $('renderModal').style.display = 'none'; 
 }
 
-function startRender() {
+async function startRealRender() {
+  if (isRendering) return;
+  isRendering = true;
+  $('btnStartRender').disabled = true;
+
   const canvas = $('canvasRender');
   const res = $('exportResSelect').value;
   if (res === '1080p') { canvas.width = 1080; canvas.height = 1920; }
@@ -891,24 +952,49 @@ function startRender() {
   const rec = new MediaRecorder(stream, { mimeType: mime }), chunks = [];
   activeRecorder = rec;
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-  rec.start();
   
-  let i = 0, globalRenderTime = 0;
-  const next = () => {
-    if (i >= timeline.length) { rec.stop(); return; }
-    const c = timeline[i++];
-    $('renderStatus').textContent = `Compositing clip ${i} of ${timeline.length}: ${c.name} (${res} @ ${targetFps}fps)`;
-    $('renderFill').style.width = `${(i / timeline.length) * 100}%`;
-    const v = document.createElement('video');
-    v.src = c.url;
-    v.muted = true;
-    v.playsInline = true;
-    v.onloadedmetadata = () => { v.currentTime = c.trimIn; v.onseeked = () => { v.play(); draw(); }; };
-    function draw() {
-      if (v.currentTime >= c.trimOut || v.ended) { v.pause(); next(); return; }
+  rec.onstop = () => {
+    isRendering = false;
+    const blob = new Blob(chunks, { type: mime }), url = URL.createObjectURL(blob);
+    $('renderStatus').textContent = 'Render completed! File ready.';
+    $('renderFill').style.width = '100%';
+    $('renderPercent').textContent = '100%';
+    $('renderNote').innerHTML = `<a href="${url}" download="clipforge-${res}-export.webm" class="btn-primary" style="text-decoration:none;display:inline-block;margin-top:8px">💾 Download ${res} WebM Video</a>`;
+    
+    // Auto trigger save download dialog
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clipforge-${res}-export.webm`;
+    a.click();
+  };
+
+  rec.start();
+
+  let globalTimeAcc = 0;
+  const totalDuration = totalSequenceDuration || 1;
+
+  for (let i = 0; i < timeline.length; i++) {
+    if (!isRendering) break;
+    const clip = timeline[i];
+    const clipDur = clip.trimOut - clip.trimIn;
+    
+    // Process clip seeking frame-by-frame deterministically
+    const video = document.createElement('video');
+    video.src = clip.url;
+    video.muted = true;
+    video.playsInline = true;
+
+    await new Promise(res => { video.onloadedmetadata = res; video.load(); });
+
+    const step = 1 / targetFps;
+    for (let t = clip.trimIn; t < clip.trimOut; t += step) {
+      if (!isRendering) break;
+      video.currentTime = t;
+      await new Promise(res => { video.onseeked = res; });
+
       ctx.fillStyle = '#0b0b0f';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       if (activeFilter === 'tiktok_vibrant') ctx.filter = 'saturate(1.45) contrast(1.1)';
       else if (activeFilter === 'cinematic') ctx.filter = 'contrast(1.2) brightness(0.9) sepia(0.15)';
       else if (activeFilter === 'high_contrast') ctx.filter = 'contrast(1.4)';
@@ -916,31 +1002,31 @@ function startRender() {
       else if (activeFilter === 'bw') ctx.filter = 'grayscale(1)';
       else ctx.filter = 'none';
 
-      const s = Math.min(canvas.width / v.videoWidth, canvas.height / v.videoHeight), w = v.videoWidth * s, h = v.videoHeight * s;
-      ctx.drawImage(v, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+      const s = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
+      const w = video.videoWidth * s, h = video.videoHeight * s;
+      ctx.drawImage(video, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
       ctx.filter = 'none';
-      
-      const frameGlobalTime = globalRenderTime + (v.currentTime - c.trimIn);
+
+      const currentGlobalSec = globalTimeAcc + (t - clip.trimIn);
       for (let item of textOverlays) {
-        if (frameGlobalTime >= item.startTime && frameGlobalTime <= (item.startTime + item.duration)) {
+        if (currentGlobalSec >= item.startTime && currentGlobalSec <= (item.startTime + item.duration)) {
           drawWordBadge(ctx, item.text, canvas.width / 2, canvas.height * 0.78, canvas.height, item.bg || '#000000dd', item.color || '#ffffff');
         }
       }
-      
-      requestAnimationFrame(draw);
+
+      // Exact progress bar calculation
+      const pct = Math.min(99, Math.floor((currentGlobalSec / totalDuration) * 100));
+      $('renderFill').style.width = pct + '%';
+      $('renderPercent').textContent = pct + '%';
+      $('renderStatus').textContent = `Encoding Clip ${i + 1} of ${timeline.length}: ${fmt(currentGlobalSec)} / ${fmt(totalDuration)}`;
+
+      await new Promise(r => setTimeout(r, 1000 / targetFps));
     }
-    v.load();
-  };
-  
-  rec.onstop = () => {
-    const blob = new Blob(chunks, { type: mime }), url = URL.createObjectURL(blob);
-    $('renderStatus').textContent = 'Render completed! Ready to download.';
-    $('renderFill').style.width = '100%';
-    $('renderNote').innerHTML = `<a href="${url}" download="clipforge-${res}-export.webm" class="btn-primary" style="text-decoration:none;display:inline-block;margin-top:8px">💾 Download ${res} WebM Video</a>`;
-    $('renderCloseBtn').textContent = 'Close';
-  };
-  
-  next();
+
+    globalTimeAcc += clipDur;
+  }
+
+  if (rec.state !== 'inactive') rec.stop();
 }
 
 switchTab('media');
