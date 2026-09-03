@@ -1,0 +1,10 @@
+{
+  "name": "clipforge-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-assisted, prompt-driven marketing video editor (static site, no backend)",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js && npx serve dist -l 3000"
+  }
+}
