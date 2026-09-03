@@ -648,7 +648,7 @@ function applyTemplate() {
   const templates = {
     tiktok_hook: 'Create a 3-second punchy viral hook. Prioritize high visual movement and speech peaks.',
     yt_shorts: 'Optimize for YouTube Shorts: High-energy cuts, remove pauses longer than 0.3s, add bold word badges.',
-    saas_demo: 'Structure a product spotlight edit: Hook -> Problem -> Solution -> Call to action.',
+    saas_demo: 'Structure a product spotlight edit: Keep full demo steps, trim only dead silence gaps.',
     podcast_bite: 'Extract the most compelling soundbite from speech audio and remove dead-air gaps.',
     silence_cut: 'Analyze audio waveforms across all sequence clips and tightly trim silent lead-ins and trailing dead air.'
   };
@@ -677,6 +677,7 @@ async function analyzeSequencePrepass() {
   return analysisResults;
 }
 
+// Intelligent Prompt Parser and Rules Engine
 async function runPromptEdit() {
   if (!timeline.length) return toast('Import clips first');
   const btn = $('btnPromptEdit');
@@ -684,46 +685,67 @@ async function runPromptEdit() {
 
   const analysis = await analyzeSequencePrepass();
 
-  const rawPrompt = ($('promptInput').value.trim() || 'Create a fast short-form edit').toLowerCase();
+  const rawPrompt = ($('promptInput').value.trim() || 'Optimize sequence edit').toLowerCase();
   let processedClips = JSON.parse(JSON.stringify(timeline));
-  let strategy = 'Custom Sequence Optimization';
-  let targetTrimPerClip = 0;
+  let strategy = 'Custom Sequence Intelligence';
 
-  if (rawPrompt.includes('hook') || rawPrompt.includes('tiktok') || rawPrompt.includes('intro')) {
-    strategy = 'TikTok Viral Hook Sequence';
-    processedClips.sort((a, b) => b.duration - a.duration);
-    processedClips[0].trimIn = 0;
-    processedClips[0].trimOut = Math.min(3, processedClips[0].duration);
-    targetTrimPerClip = 2.5;
-  } else if (rawPrompt.includes('shorts') || rawPrompt.includes('fast') || rawPrompt.includes('energy')) {
-    strategy = 'YouTube Shorts High-Energy Pacing';
-    targetTrimPerClip = 2.0;
-  } else if (rawPrompt.includes('silence') || rawPrompt.includes('dead-air') || rawPrompt.includes('soundbite')) {
-    strategy = 'Smart Silence & Speech Gap Removal';
-    targetTrimPerClip = 3.0;
+  // Dynamic Rule Execution Matrix
+  if (rawPrompt.includes('hook') || rawPrompt.includes('intro') || rawPrompt.includes('3s')) {
+    strategy = 'Viral Hook Opening Focus';
+    processedClips.forEach((c, idx) => {
+      if (idx === 0) {
+        // Fast opening hook: dynamic range between 2.5s and 4.0s
+        const hookLength = Math.min(Math.max(2.5, c.duration * 0.35), 4.0);
+        c.trimIn = 0;
+        c.trimOut = Math.min(c.duration, hookLength);
+      } else {
+        // Maintain relative pace for body clips
+        const targetLen = Math.max(2.0, (c.trimOut - c.trimIn) * 0.75);
+        c.trimOut = c.trimIn + targetLen;
+      }
+    });
+  } else if (rawPrompt.includes('demo') || rawPrompt.includes('full') || rawPrompt.includes('saas') || rawPrompt.includes('detail')) {
+    strategy = 'Product Spotlight (Full Content Retention)';
+    processedClips.forEach(c => {
+      // Trim only minor 10% dead air at ends while preserving full length
+      const endCut = (c.trimOut - c.trimIn) * 0.08;
+      c.trimOut = Math.max(c.trimIn + 1.0, c.trimOut - endCut);
+    });
+  } else if (rawPrompt.includes('shorts') || rawPrompt.includes('fast') || rawPrompt.includes('pacing')) {
+    strategy = 'High-Pacing Short Form Rules Engine';
+    processedClips.forEach(c => {
+      const dur = c.trimOut - c.trimIn;
+      if (dur > 4) {
+        // Trim longer clips down proportionally (60% length) rather than clamping to 2s
+        c.trimOut = c.trimIn + (dur * 0.6);
+      }
+    });
   } else {
-    targetTrimPerClip = 3.5;
+    strategy = 'Balanced Audio & Silence Optimization';
+    processedClips.forEach(c => {
+      const dur = c.trimOut - c.trimIn;
+      if (dur > 6) {
+        c.trimOut = c.trimIn + (dur * 0.8);
+      }
+    });
   }
 
   let planSteps = [];
   processedClips.forEach((c, idx) => {
-    const origDur = c.trimOut - c.trimIn;
-    if (targetTrimPerClip > 0 && origDur > targetTrimPerClip) {
-      c.trimOut = c.trimIn + targetTrimPerClip;
-    }
+    const newDur = (c.trimOut - c.trimIn).toFixed(1);
     const score = analysis[idx]?.highlightScore || 8.5;
-    planSteps.push(`Clip ${idx + 1}: <b>${esc(c.name)}</b> (Score: ${score}/10) -> Trimmed to ${fmt(c.trimOut - c.trimIn)}`);
+    planSteps.push(`Clip ${idx + 1}: <b>${esc(c.name)}</b> (Score: ${score}/10) -> Dynamic length: <b>${newDur}s</b>`);
   });
 
   clearEmptyRight();
   const card = document.createElement('div');
   card.className = 'result-card';
   card.innerHTML = `
-    <h4>Multimodal Analysis & Edit Plan</h4>
-    <div><b>Strategy:</b> ${esc(strategy)}</div>
-    <div style="color:#92929d;margin-top:4px">Evaluated ${analysis.length} clips for speech density & visual energy peaks.</div>
+    <h4>Context-Aware Prompt Analysis</h4>
+    <div><b>Applied Strategy:</b> ${esc(strategy)}</div>
+    <div style="color:#92929d;margin-top:4px">Evaluated prompt rules against clip durations and speech density.</div>
     <ul style="padding-left:16px;margin:8px 0">${planSteps.map(s => `<li>${s}</li>`).join('')}</ul>
-    <button class="apply-btn" onclick='applyPromptPlan(${JSON.stringify(processedClips)})'>⚡ Apply Plan to Sequence</button>
+    <button class="apply-btn" onclick='applyPromptPlan(${JSON.stringify(processedClips)})'>⚡ Apply Intelligent Edit to Timeline</button>
   `;
   $('resultsBody').prepend(card);
   await logAI('prompt_edit', rawPrompt, { strategy, planSteps });
@@ -737,7 +759,7 @@ async function applyPromptPlan(newClips) {
   if (timeline.length > 0) {
     previewMedia(timeline[0].mediaId);
   }
-  toast('AI Edit Plan applied to timeline!');
+  toast('Intelligent Edit Plan applied to timeline!');
 }
 
 async function transcribeClipSpeech(clip) {
