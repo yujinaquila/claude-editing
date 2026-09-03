@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClipForge Studio — Autonomous AI Video Editor</title>
+<title>ClipForge Studio — Autonomous Video Editor</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --surface-base: #060709;
-  --surface-panel: #0d0e12;
-  --surface-card: #14161d;
-  --surface-input: #1a1d26;
-  --surface-hover: #222633;
+  --bg-base: #060709;
+  --bg-panel: #0d0e12;
+  --bg-card: #14161d;
+  --bg-input: #1a1d26;
+  --bg-hover: #222633;
   --border-color: #262a38;
   --color-brand: #6366f1;
   --color-brand-hover: #4f46e5;
@@ -26,17 +26,16 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--surface-base); color: var(--text-primary); font: 13px Inter, system-ui, sans-serif; height: 100vh; overflow: hidden; }
+body { background: var(--bg-base); color: var(--text-primary); font: 13px Inter, system-ui, sans-serif; height: 100vh; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; transition: all 0.15s ease; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 .hidden { display: none !important; }
 .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
 
-/* Auth Overlay */
 #gateway {
   position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 50% 30%, #1e1b4b, var(--surface-base) 80%);
+  background: radial-gradient(circle at 50% 30%, #1e1b4b, var(--bg-base) 80%);
 }
 .gateway-box { width: 390px; padding: 32px; background: rgba(13, 14, 18, 0.92); backdrop-filter: blur(24px); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: 0 30px 80px rgba(0,0,0,0.8); }
 .brand-badge { width: 36px; height: 36px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-brand), var(--color-accent)); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; color: #fff; }
@@ -46,7 +45,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .field-group { margin-bottom: 14px; }
 .field-group label { display: block; color: var(--text-secondary); font-size: 11px; margin-bottom: 6px; font-weight: 600; }
 .field-group input, .field-group select, .field-group textarea {
-  width: 100%; background: var(--surface-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; outline: none; transition: border-color 0.2s;
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; outline: none; transition: border-color 0.2s;
 }
 .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color: var(--color-brand); }
 .btn-solid { width: 100%; background: var(--color-brand); color: #fff; padding: 11px; border-radius: var(--radius-sm); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -56,7 +55,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .or-divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 10px; margin: 18px 0; text-transform: uppercase; font-weight: 700; }
 .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
 
-/* Main Studio Layout */
 #studio {
   display: none; height: 100vh;
   grid-template-rows: 50px 1fr 270px;
@@ -65,44 +63,39 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 #studio.active { display: grid; }
 
-/* Studio Header */
-#studioHeader { grid-area: header; background: var(--surface-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+#studioHeader { grid-area: header; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
 .header-cluster { display: flex; align-items: center; gap: 14px; }
 .project-tag { color: var(--text-muted); font-size: 11px; border-left: 1px solid var(--border-color); padding-left: 14px; font-weight: 500; }
 .btn-export { background: var(--color-accent); color: #fff; padding: 7px 16px; border-radius: var(--radius-sm); font-weight: 700; font-size: 12px; }
-.user-pill { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; border: 1px solid var(--border-color); }
+.user-pill { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; border: 1px solid var(--border-color); }
 
-/* Sidebar Drawer */
-#sidebarDrawer { grid-area: sidebar; background: var(--surface-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
+#sidebarDrawer { grid-area: sidebar; background: var(--bg-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
 .drawer-nav { display: flex; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); }
 .nav-tab { flex: 1; text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 11px; font-weight: 700; border-bottom: 2px solid transparent; }
-.nav-tab.active { color: #fff; border-color: var(--color-brand); background: var(--surface-panel); }
+.nav-tab.active { color: #fff; border-color: var(--color-brand); background: var(--bg-panel); }
 .tab-content { padding: 16px; overflow-y: auto; flex: 1; }
 .drop-zone { width: 100%; padding: 18px; border: 1.5px dashed var(--border-color); border-radius: var(--radius-md); color: var(--text-muted); text-align: center; margin-bottom: 12px; transition: all 0.2s; }
 .drop-zone:hover { border-color: var(--color-brand); color: #fff; background: rgba(99, 102, 241, 0.05); }
-.asset-card { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--surface-card); border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid transparent; }
-.asset-card:hover { border-color: var(--border-color); background: var(--surface-hover); }
+.asset-card { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--bg-card); border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid transparent; }
+.asset-card:hover { border-color: var(--border-color); background: var(--bg-hover); }
 .asset-preview { width: 54px; height: 34px; object-fit: cover; border-radius: 4px; background: #000; }
 .asset-details { flex: 1; min-width: 0; }
 .asset-name { font-weight: 700; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .asset-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
-/* Viewport Stage */
 #viewportStage { grid-area: stage; background: #020304; display: flex; flex-direction: column; position: relative; }
 .stage-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; position: relative; }
 .media-viewport { position: relative; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); overflow: hidden; background: #000; border: 1px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.9); }
 #videoElement { max-width: 100%; max-height: 52vh; display: block; }
 #badgeCanvas { max-width: 100%; max-height: 52vh; display: none; }
-.playback-controls { display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface-panel); border-top: 1px solid var(--border-color); }
-.control-btn { width: 34px; height: 34px; border: 1px solid var(--border-color); background: var(--surface-card); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
+.playback-controls { display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--bg-panel); border-top: 1px solid var(--border-color); }
+.control-btn { width: 34px; height: 34px; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
 
-/* Inspector Panel */
-#inspectorPanel { grid-area: inspector; background: var(--surface-panel); border-left: 1px solid var(--border-color); padding: 16px; overflow-y: auto; }
-.console-card { background: var(--surface-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; font-size: 11px; line-height: 1.5; }
+#inspectorPanel { grid-area: inspector; background: var(--bg-panel); border-left: 1px solid var(--border-color); padding: 16px; overflow-y: auto; }
+.console-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; font-size: 11px; line-height: 1.5; }
 .console-card h4 { color: #a5b4fc; margin-bottom: 6px; font-size: 12px; }
 
-/* Timeline Editor */
-#timelineEditor { grid-area: timeline; background: var(--surface-panel); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
+#timelineEditor { grid-area: timeline; background: var(--bg-panel); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
 .timeline-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); }
 .tracks-container { flex: 1; padding: 12px; overflow-x: auto; overflow-y: auto; position: relative; }
 #rulerScale { height: 22px; background: #090a0d; border-bottom: 1px solid var(--border-color); position: relative; cursor: pointer; user-select: none; }
@@ -117,17 +110,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .edge-trim.right { right: 0; }
 .edge-trim:hover { background: rgba(99, 102, 241, 0.6); }
 
-/* System Alerts & Modals */
-#systemToast { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; background: var(--surface-card); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: var(--radius-md); font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-weight: 600; }
+#systemToast { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; background: var(--bg-card); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: var(--radius-md); font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-weight: 600; }
 #renderOverlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; }
-.render-card { width: 400px; background: var(--surface-panel); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
-.render-progress { height: 8px; background: var(--surface-input); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+.render-card { width: 400px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+.render-progress { height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; margin: 12px 0; }
 .render-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-brand), var(--color-accent)); transition: width 0.1s linear; }
 </style>
 </head>
 <body>
 
-<!-- Login / Auth Gateway -->
 <div id="gateway">
   <div class="gateway-box">
     <div class="brand-header">
@@ -146,7 +137,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   </div>
 </div>
 
-<!-- Studio Workbench Layout -->
 <div id="studio">
   <header id="studioHeader">
     <div class="header-cluster">
@@ -163,7 +153,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     </div>
   </header>
 
-  <!-- Left Sidebar Drawer -->
   <aside id="sidebarDrawer">
     <div class="drawer-nav">
       <button class="nav-tab active" data-target="mediaTab" onclick="UIController.switchDrawerTab('mediaTab')">Media</button>
@@ -172,14 +161,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
       <button class="nav-tab" data-target="aiTab" onclick="UIController.switchDrawerTab('aiTab')">AI Engine</button>
     </div>
 
-    <!-- Media Tab -->
     <div class="tab-content" id="mediaTab">
       <button class="drop-zone" onclick="UIController.triggerImport()">＋ Import Video Files</button>
       <input type="file" id="filePicker" accept="video/*" multiple class="hidden" onchange="MediaEngine.onFilesImported(event)">
       <div id="mediaAssetList"></div>
     </div>
 
-    <!-- Captions Tab -->
     <div class="tab-content hidden" id="textTab">
       <div class="field-group">
         <label>Recognition Language</label>
@@ -208,7 +195,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
       <div id="captionListContainer" style="margin-top:14px;"></div>
     </div>
 
-    <!-- FX & Audio Tab -->
     <div class="tab-content hidden" id="fxTab">
       <div class="field-group">
         <label>Color Grading Preset</label>
@@ -232,7 +218,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
       </div>
     </div>
 
-    <!-- AI Tools Tab -->
     <div class="tab-content hidden" id="aiTab">
       <div class="field-group">
         <label>Strategy Preset</label>
@@ -255,7 +240,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     </div>
   </aside>
 
-  <!-- Viewport Stage -->
   <main id="viewportStage">
     <div class="stage-area">
       <div class="media-viewport">
@@ -277,7 +261,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     </div>
   </main>
 
-  <!-- Inspector Panel -->
   <aside id="inspectorPanel">
     <div style="font-size:11px; font-weight:800; margin-bottom:12px; display:flex; justify-content:space-between;">
       <span>Execution Diagnostics</span>
@@ -290,7 +273,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     </div>
   </aside>
 
-  <!-- Timeline Editor -->
   <footer id="timelineEditor">
     <div class="timeline-bar">
       <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">Sequence Multi-Track</span>
@@ -308,7 +290,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   </footer>
 </div>
 
-<!-- Notifications & Export Modal -->
 <div id="systemToast"></div>
 
 <div id="renderOverlay">
@@ -340,9 +321,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 </div>
 
 <script>
-/* ==========================================================================
-   Global Store & Utilities
-   ========================================================================== */
 const SUPABASE_URL = 'https://attrgssmemtipoingkpe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zRqpbpSxI3JDYAv4wnqajA_RJfLNcIX';
 const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
@@ -374,9 +352,6 @@ const timecode = sec => {
   return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 };
 
-/* ==========================================================================
-   Persistence Engine (IndexedDB)
-   ========================================================================== */
 const PersistenceEngine = {
   async init() {
     return new Promise(res => {
@@ -416,9 +391,6 @@ const PersistenceEngine = {
   }
 };
 
-/* ==========================================================================
-   Auth Engine
-   ========================================================================== */
 const AuthEngine = {
   async init() {
     if (supabase) {
@@ -461,9 +433,6 @@ const AuthEngine = {
   }
 };
 
-/* ==========================================================================
-   UI Controller
-   ========================================================================== */
 const UIController = {
   switchDrawerTab(tabId) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.target === tabId));
@@ -495,9 +464,6 @@ const UIController = {
   }
 };
 
-/* ==========================================================================
-   Media Engine
-   ========================================================================== */
 const MediaEngine = {
   async onFilesImported(e) {
     for (const file of e.target.files) {
@@ -510,7 +476,9 @@ const MediaEngine = {
         canvas.width = 160; canvas.height = 90;
         video.currentTime = Math.min(0.5, video.duration / 2);
         video.onseeked = () => {
-          canvas.getContext('2d').drawImage(video, 0, 0, 160, 90);
+          try {
+            canvas.getContext('2d').drawImage(video, 0, 0, 160, 90);
+          } catch(e) {}
           const item = { id, name: file.name, url, duration: video.duration, thumb: canvas.toDataURL('image/jpeg', 0.6) };
           ClipForgeStore.assets.push(item);
           ClipForgeStore.timeline.push({ id: 'clip_' + id, assetId: id, name: file.name, url, duration: video.duration, trimIn: 0, trimOut: video.duration });
@@ -537,9 +505,6 @@ const MediaEngine = {
   }
 };
 
-/* ==========================================================================
-   Playback Engine
-   ========================================================================== */
 const PlaybackEngine = {
   preview(assetId) {
     const asset = ClipForgeStore.assets.find(a => a.id === assetId);
@@ -554,7 +519,7 @@ const PlaybackEngine = {
     const v = $('videoElement');
     if (!v.src && !ClipForgeStore.timeline.length) return;
     if (v.paused) {
-      v.play();
+      v.play().catch(() => {});
       if (ClipForgeStore.bgMusicTrack) ClipForgeStore.bgMusicTrack.play().catch(() => {});
       $('playIcon').textContent = '⏸';
     } else {
@@ -571,9 +536,6 @@ $('videoElement').ontimeupdate = e => {
   OverlayEngine.render();
 };
 
-/* ==========================================================================
-   Timeline Engine
-   ========================================================================== */
 const TimelineEngine = {
   render() {
     ClipForgeStore.totalDuration = ClipForgeStore.timeline.reduce((sum, c) => sum + (c.trimOut - c.trimIn), 0);
@@ -662,9 +624,6 @@ const TimelineEngine = {
   }
 };
 
-/* ==========================================================================
-   Overlay Engine
-   ========================================================================== */
 const OverlayEngine = {
   render() {
     const v = $('videoElement');
@@ -706,9 +665,6 @@ const OverlayEngine = {
   }
 };
 
-/* ==========================================================================
-   Captions & Effects Subsystem
-   ========================================================================== */
 const CaptionEngine = {
   addManualCaption() {
     const text = $('captionTextInput').value.trim();
@@ -766,9 +722,6 @@ const AudioEngine = {
   }
 };
 
-/* ==========================================================================
-   AI Processing Module
-   ========================================================================== */
 const AIEngine = {
   applyTemplate() {
     const presets = {
@@ -847,9 +800,6 @@ const AIEngine = {
   }
 };
 
-/* ==========================================================================
-   Render & Export Pipeline
-   ========================================================================== */
 const RenderPipeline = {
   openModal() {
     if (!ClipForgeStore.timeline.length) return notify('Add clips to timeline first');
@@ -914,9 +864,13 @@ const RenderPipeline = {
         else if (ClipForgeStore.activeFilter === 'bw') ctx.filter = 'grayscale(1)';
         else ctx.filter = 'none';
 
-        const scale = Math.min(canvas.width / v.videoWidth, canvas.height / v.videoHeight);
-        const w = v.videoWidth * scale, h = v.videoHeight * scale;
-        ctx.drawImage(v, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+        if (v.readyState >= 2) {
+          try {
+            const scale = Math.min(canvas.width / v.videoWidth, canvas.height / v.videoHeight);
+            const w = v.videoWidth * scale, h = v.videoHeight * scale;
+            ctx.drawImage(v, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+          } catch(e) {}
+        }
         ctx.filter = 'none';
 
         const currentGlobalSec = globalTime + (v.currentTime - clip.trimIn);
@@ -941,9 +895,6 @@ const RenderPipeline = {
   }
 };
 
-/* ==========================================================================
-   Boot Controller
-   ========================================================================== */
 window.addEventListener('DOMContentLoaded', () => {
   AuthEngine.init();
 });
