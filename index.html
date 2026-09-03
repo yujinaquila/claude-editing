@@ -3,370 +3,371 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClipForge AI Pro — Modular Studio</title>
+<title>ClipForge Studio — Autonomous AI Video Editor</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --bg-dark: #07070a;
-  --bg-panel: #111116;
-  --bg-card: #181820;
-  --bg-hover: #22222e;
-  --border: #2a2a36;
-  --primary: #7c5cff;
-  --primary-hover: #6a46ff;
-  --accent-pink: #ff5470;
-  --accent-yellow: #ffe600;
-  --text-main: #f3f3f8;
-  --text-muted: #8e8e9f;
-  --text-dim: #5c5c6c;
+  --surface-base: #060709;
+  --surface-panel: #0d0e12;
+  --surface-card: #14161d;
+  --surface-input: #1a1d26;
+  --surface-hover: #222633;
+  --border-color: #262a38;
+  --color-brand: #6366f1;
+  --color-brand-hover: #4f46e5;
+  --color-accent: #ec4899;
+  --color-highlight: #f59e0b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg-dark); color: var(--text-main); font: 13px Inter, system-ui, sans-serif; height: 100vh; overflow: hidden; }
+body { background: var(--surface-base); color: var(--text-primary); font: 13px Inter, system-ui, sans-serif; height: 100vh; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; transition: all 0.15s ease; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 .hidden { display: none !important; }
-.mono { font-family: monospace; }
+.mono { font-family: ui-monospace, SFMono-Regular, monospace; }
 
-/* Modal & Auth Overlays */
-#authOverlay {
-  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 50% 20%, #201338, var(--bg-dark) 70%);
+/* Auth Overlay */
+#gateway {
+  position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 30%, #1e1b4b, var(--surface-base) 80%);
 }
-.auth-card { width: 380px; padding: 32px; background: rgba(17, 17, 22, 0.9); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
-.auth-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.brand-logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--primary), #c084fc); }
-.brand-title { font-weight: 800; font-size: 18px; }
-.auth-sub { color: var(--text-muted); font-size: 12px; margin-bottom: 20px; line-height: 1.4; }
-.form-group { margin-bottom: 12px; }
-.form-group label { display: block; color: var(--text-muted); font-size: 11px; margin-bottom: 4px; }
-.form-group input, .form-group select, .form-group textarea {
-  width: 100%; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 9px; outline: none;
+.gateway-box { width: 390px; padding: 32px; background: rgba(13, 14, 18, 0.92); backdrop-filter: blur(24px); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: 0 30px 80px rgba(0,0,0,0.8); }
+.brand-badge { width: 36px; height: 36px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-brand), var(--color-accent)); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; color: #fff; }
+.brand-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.brand-title { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+.gateway-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.5; margin-bottom: 24px; }
+.field-group { margin-bottom: 14px; }
+.field-group label { display: block; color: var(--text-secondary); font-size: 11px; margin-bottom: 6px; font-weight: 600; }
+.field-group input, .field-group select, .field-group textarea {
+  width: 100%; background: var(--surface-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; outline: none; transition: border-color 0.2s;
 }
-.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
-.btn-primary { width: 100%; background: var(--primary); color: #fff; padding: 10px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-.btn-secondary { border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; font-size: 12px; }
-.btn-secondary:hover:not(:disabled) { border-color: var(--primary); color: #fff; }
-.auth-divider { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 10px; margin: 16px 0; }
-.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color: var(--color-brand); }
+.btn-solid { width: 100%; background: var(--color-brand); color: #fff; padding: 11px; border-radius: var(--radius-sm); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-solid:hover:not(:disabled) { background: var(--color-brand-hover); }
+.btn-outline { border: 1px solid var(--border-color); padding: 9px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; }
+.btn-outline:hover:not(:disabled) { border-color: var(--color-brand); color: #fff; }
+.or-divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 10px; margin: 18px 0; text-transform: uppercase; font-weight: 700; }
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
 
-/* Main Workbench Layout */
-#workbench {
+/* Main Studio Layout */
+#studio {
   display: none; height: 100vh;
-  grid-template-rows: 48px 1fr 260px;
-  grid-template-columns: 280px minmax(0, 1fr) 300px;
-  grid-template-areas: "top top top" "left center right" "bottom bottom bottom";
+  grid-template-rows: 50px 1fr 270px;
+  grid-template-columns: 310px minmax(0, 1fr) 300px;
+  grid-template-areas: "header header header" "sidebar stage inspector" "timeline timeline timeline";
 }
-#workbench.active { display: grid; }
+#studio.active { display: grid; }
 
-/* Top Navigation Bar */
-#topNav { grid-area: top; background: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
-.nav-group { display: flex; align-items: center; gap: 12px; }
-.nav-project-title { color: var(--text-muted); font-size: 12px; border-left: 1px solid var(--border); padding-left: 12px; }
-.btn-render { background: var(--accent-pink); color: #fff; padding: 7px 14px; border-radius: 7px; font-weight: 700; font-size: 12px; }
-.user-avatar { width: 26px; height: 26px; border-radius: 50%; background: #2f225c; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; }
+/* Studio Header */
+#studioHeader { grid-area: header; background: var(--surface-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.header-cluster { display: flex; align-items: center; gap: 14px; }
+.project-tag { color: var(--text-muted); font-size: 11px; border-left: 1px solid var(--border-color); padding-left: 14px; font-weight: 500; }
+.btn-export { background: var(--color-accent); color: #fff; padding: 7px 16px; border-radius: var(--radius-sm); font-weight: 700; font-size: 12px; }
+.user-pill { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; border: 1px solid var(--border-color); }
 
-/* Left Studio Drawer */
-#leftDrawer { grid-area: left; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-.drawer-tabs { display: flex; border-bottom: 1px solid var(--border); }
-.drawer-tab { flex: 1; text-align: center; padding: 10px 0; color: var(--text-muted); font-size: 11px; font-weight: 700; border-bottom: 2px solid transparent; }
-.drawer-tab.active { color: #fff; border-color: var(--primary); }
-.drawer-body { padding: 14px; overflow-y: auto; flex: 1; }
-.upload-dropzone { width: 100%; padding: 14px; border: 1.5px dashed var(--border); border-radius: 8px; color: var(--text-muted); text-align: center; margin-bottom: 10px; }
-.upload-dropzone:hover { border-color: var(--primary); color: #fff; }
-.asset-item { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--bg-card); border-radius: 6px; margin-bottom: 8px; border: 1px solid transparent; }
-.asset-item:hover { border-color: var(--border); background: var(--bg-hover); }
-.asset-thumb { width: 50px; height: 32px; object-fit: cover; border-radius: 4px; background: #000; }
-.asset-info { flex: 1; min-width: 0; }
-.asset-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.asset-meta { font-size: 10px; color: var(--text-dim); }
+/* Sidebar Drawer */
+#sidebarDrawer { grid-area: sidebar; background: var(--surface-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
+.drawer-nav { display: flex; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); }
+.nav-tab { flex: 1; text-align: center; padding: 12px 0; color: var(--text-muted); font-size: 11px; font-weight: 700; border-bottom: 2px solid transparent; }
+.nav-tab.active { color: #fff; border-color: var(--color-brand); background: var(--surface-panel); }
+.tab-content { padding: 16px; overflow-y: auto; flex: 1; }
+.drop-zone { width: 100%; padding: 18px; border: 1.5px dashed var(--border-color); border-radius: var(--radius-md); color: var(--text-muted); text-align: center; margin-bottom: 12px; transition: all 0.2s; }
+.drop-zone:hover { border-color: var(--color-brand); color: #fff; background: rgba(99, 102, 241, 0.05); }
+.asset-card { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--surface-card); border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid transparent; }
+.asset-card:hover { border-color: var(--border-color); background: var(--surface-hover); }
+.asset-preview { width: 54px; height: 34px; object-fit: cover; border-radius: 4px; background: #000; }
+.asset-details { flex: 1; min-width: 0; }
+.asset-name { font-weight: 700; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
-/* Center Display Viewport */
-#centerViewport { grid-area: center; background: #030304; display: flex; flex-direction: column; position: relative; }
-.viewport-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; position: relative; }
-.video-frame { position: relative; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 10px; overflow: hidden; background: #000; border: 1px solid var(--border); }
-#mainVideo { max-width: 100%; max-height: 54vh; display: block; }
-#overlayCanvas { max-width: 100%; max-height: 54vh; display: none; }
-.playback-bar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--bg-panel); border-top: 1px solid var(--border); }
-.play-btn { width: 32px; height: 32px; border: 1px solid var(--border); background: var(--bg-card); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+/* Viewport Stage */
+#viewportStage { grid-area: stage; background: #020304; display: flex; flex-direction: column; position: relative; }
+.stage-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; position: relative; }
+.media-viewport { position: relative; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); overflow: hidden; background: #000; border: 1px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.9); }
+#videoElement { max-width: 100%; max-height: 52vh; display: block; }
+#badgeCanvas { max-width: 100%; max-height: 52vh; display: none; }
+.playback-controls { display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface-panel); border-top: 1px solid var(--border-color); }
+.control-btn { width: 34px; height: 34px; border: 1px solid var(--border-color); background: var(--surface-card); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
 
-/* Right Inspector Panel */
-#rightInspector { grid-area: right; background: var(--bg-panel); border-left: 1px solid var(--border); padding: 14px; overflow-y: auto; }
-.log-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 11px; line-height: 1.4; }
-.log-card h4 { color: #c0b3ff; margin-bottom: 4px; }
+/* Inspector Panel */
+#inspectorPanel { grid-area: inspector; background: var(--surface-panel); border-left: 1px solid var(--border-color); padding: 16px; overflow-y: auto; }
+.console-card { background: var(--surface-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; font-size: 11px; line-height: 1.5; }
+.console-card h4 { color: #a5b4fc; margin-bottom: 6px; font-size: 12px; }
 
-/* Bottom Timeline Workspace */
-#bottomTimeline { grid-area: bottom; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-.timeline-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 14px; border-bottom: 1px solid var(--border); }
-.track-scroll-area { flex: 1; padding: 10px; overflow-x: auto; overflow-y: auto; position: relative; }
-#timelineRuler { height: 20px; background: #0c0c0f; border-bottom: 1px solid var(--border); position: relative; cursor: pointer; user-select: none; }
-.ruler-tick { position: absolute; font-size: 9px; color: var(--text-dim); border-left: 1px solid var(--border); padding-left: 3px; top: 0; bottom: 0; display: flex; align-items: center; }
-#playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent-pink); z-index: 50; pointer-events: none; }
-.track-row-label { font-size: 10px; color: var(--text-muted); margin: 6px 0 2px; }
-.timeline-track { display: flex; gap: 4px; height: 40px; min-width: 100%; position: relative; }
-.clip-node { height: 40px; position: relative; background: linear-gradient(#2b2848, #1b1930); border: 1px solid #5a4db8; border-radius: 5px; display: flex; align-items: flex-end; overflow: hidden; user-select: none; }
-.clip-label { font-size: 10px; font-weight: 700; padding: 3px; background: rgba(0,0,0,0.6); width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.clip-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 5; }
-.clip-handle.left { left: 0; }
-.clip-handle.right { right: 0; }
-.clip-handle:hover { background: rgba(124, 92, 255, 0.6); }
+/* Timeline Editor */
+#timelineEditor { grid-area: timeline; background: var(--surface-panel); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; }
+.timeline-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); }
+.tracks-container { flex: 1; padding: 12px; overflow-x: auto; overflow-y: auto; position: relative; }
+#rulerScale { height: 22px; background: #090a0d; border-bottom: 1px solid var(--border-color); position: relative; cursor: pointer; user-select: none; }
+.scale-tick { position: absolute; font-size: 9px; color: var(--text-muted); border-left: 1px solid var(--border-color); padding-left: 4px; top: 0; bottom: 0; display: flex; align-items: center; }
+#scrubLine { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--color-accent); z-index: 100; pointer-events: none; }
+.track-header { font-size: 10px; color: var(--text-muted); margin: 8px 0 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.track-lane { display: flex; gap: 4px; height: 42px; min-width: 100%; position: relative; }
+.timeline-block { height: 42px; position: relative; background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #4338ca; border-radius: var(--radius-sm); display: flex; align-items: flex-end; overflow: hidden; user-select: none; }
+.block-title { font-size: 10px; font-weight: 700; padding: 4px; background: rgba(0,0,0,0.6); width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edge-trim { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 10; }
+.edge-trim.left { left: 0; }
+.edge-trim.right { right: 0; }
+.edge-trim:hover { background: rgba(99, 102, 241, 0.6); }
 
-/* Global Components */
-#toastNotification { display: none; position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 2000; background: var(--bg-card); border: 1px solid var(--border); padding: 8px 16px; border-radius: 6px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-#exportModal { position: fixed; inset: 0; z-index: 1500; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; }
-.modal-card { width: 380px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-.progress-track { height: 6px; background: var(--bg-card); border-radius: 3px; overflow: hidden; margin: 10px 0; }
-.progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), var(--accent-pink)); transition: width 0.1s linear; }
+/* System Alerts & Modals */
+#systemToast { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; background: var(--surface-card); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: var(--radius-md); font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-weight: 600; }
+#renderOverlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; }
+.render-card { width: 400px; background: var(--surface-panel); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+.render-progress { height: 8px; background: var(--surface-input); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+.render-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-brand), var(--color-accent)); transition: width 0.1s linear; }
 </style>
 </head>
 <body>
 
-<!-- Authentication Overlay -->
-<div id="authOverlay">
-  <div class="auth-card">
-    <div class="auth-header">
-      <div class="brand-logo"></div>
-      <div class="brand-title">ClipForge Pro</div>
+<!-- Login / Auth Gateway -->
+<div id="gateway">
+  <div class="gateway-box">
+    <div class="brand-header">
+      <div class="brand-badge">CF</div>
+      <div class="brand-title">ClipForge AI</div>
     </div>
-    <div class="auth-sub">Reliable browser-native video editing engine.</div>
-    <button class="btn-primary" onclick="AuthModule.loginGoogle()">Sign in with Google</button>
-    <div class="auth-divider">or email access</div>
-    <div class="form-group">
+    <div class="gateway-desc">Next-generation browser video studio powered by local AI sequence rules.</div>
+    <button class="btn-solid" onclick="AuthEngine.googleLogin()">Continue with Google</button>
+    <div class="or-divider">or email authorization</div>
+    <div class="field-group">
       <label>Email Address</label>
-      <input type="email" id="inputAuthEmail" placeholder="creator@clipforge.io">
+      <input type="email" id="authEmailInput" placeholder="creator@clipforge.studio">
     </div>
-    <button class="btn-primary" onclick="AuthModule.loginEmail()">Send Login Link</button>
-    <button class="btn-secondary" style="width:100%; margin-top:8px;" onclick="AuthModule.loginGuest()">⚡ Offline Guest Mode</button>
+    <button class="btn-solid" onclick="AuthEngine.emailLogin()">Send Access Key</button>
+    <button class="btn-outline" style="width:100%; margin-top:10px;" onclick="AuthEngine.guestLogin()">⚡ Launch Guest Studio</button>
   </div>
 </div>
 
-<!-- Main Workbench UI -->
-<div id="workbench">
-  <!-- Top Navigation -->
-  <header id="topNav">
-    <div class="nav-group">
-      <div class="brand-logo" style="width:20px; height:20px;"></div>
-      <div style="font-weight:800;">ClipForge Pro</div>
-      <div class="nav-project-title">Timeline Session</div>
+<!-- Studio Workbench Layout -->
+<div id="studio">
+  <header id="studioHeader">
+    <div class="header-cluster">
+      <div class="brand-badge" style="width:24px; height:24px; font-size:12px;">CF</div>
+      <div style="font-weight:800; font-size:14px;">ClipForge Studio</div>
+      <div class="project-tag">Active Sequence Workspace</div>
     </div>
-    <div class="nav-group">
-      <button class="btn-secondary" onclick="UIModule.openImport()">Import Media</button>
-      <button class="btn-secondary" onclick="StorageModule.saveState(true)">Save</button>
-      <button class="btn-render" onclick="ExportModule.showModal()">Export Video</button>
-      <div class="user-avatar" id="avatarBadge">G</div>
-      <button class="btn-secondary" onclick="AuthModule.logout()">Exit</button>
+    <div class="header-cluster">
+      <button class="btn-outline" onclick="UIController.triggerImport()">Import Media</button>
+      <button class="btn-outline" onclick="PersistenceEngine.saveLocal(true)">Save Project</button>
+      <button class="btn-export" onclick="RenderPipeline.openModal()">Render Video</button>
+      <div class="user-pill" id="userPill">G</div>
+      <button class="btn-outline" onclick="AuthEngine.logout()">Sign Out</button>
     </div>
   </header>
 
-  <!-- Left Studio Drawer -->
-  <aside id="leftDrawer">
-    <div class="drawer-tabs">
-      <button class="drawer-tab active" data-tab="tabMedia" onclick="UIModule.selectTab('tabMedia')">Media</button>
-      <button class="drawer-tab" data-tab="tabText" onclick="UIModule.selectTab('tabText')">Captions</button>
-      <button class="drawer-tab" data-tab="tabFX" onclick="UIModule.selectTab('tabFX')">FX / Audio</button>
-      <button class="drawer-tab" data-tab="tabAI" onclick="UIModule.selectTab('tabAI')">AI Tools</button>
+  <!-- Left Sidebar Drawer -->
+  <aside id="sidebarDrawer">
+    <div class="drawer-nav">
+      <button class="nav-tab active" data-target="mediaTab" onclick="UIController.switchDrawerTab('mediaTab')">Media</button>
+      <button class="nav-tab" data-target="textTab" onclick="UIController.switchDrawerTab('textTab')">Captions</button>
+      <button class="nav-tab" data-target="fxTab" onclick="UIController.switchDrawerTab('fxTab')">Audio & FX</button>
+      <button class="nav-tab" data-target="aiTab" onclick="UIController.switchDrawerTab('aiTab')">AI Engine</button>
     </div>
 
     <!-- Media Tab -->
-    <div class="drawer-body" id="tabMedia">
-      <button class="upload-dropzone" onclick="UIModule.openImport()">＋ Import Video Files</button>
-      <input type="file" id="filePicker" accept="video/*" multiple class="hidden" onchange="MediaModule.onFilesSelected(event)">
-      <div id="mediaContainer"></div>
+    <div class="tab-content" id="mediaTab">
+      <button class="drop-zone" onclick="UIController.triggerImport()">＋ Import Video Files</button>
+      <input type="file" id="filePicker" accept="video/*" multiple class="hidden" onchange="MediaEngine.onFilesImported(event)">
+      <div id="mediaAssetList"></div>
     </div>
 
-    <!-- Text Captions Tab -->
-    <div class="drawer-body hidden" id="tabText">
-      <div class="form-group">
-        <label>Subtitle Language</label>
-        <select id="selectLang">
+    <!-- Captions Tab -->
+    <div class="tab-content hidden" id="textTab">
+      <div class="field-group">
+        <label>Recognition Language</label>
+        <select id="langSelect">
           <option value="id-ID">Bahasa Indonesia</option>
           <option value="en-US">English (US)</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Caption Text Overlay</label>
-        <input type="text" id="inputCaptionText" placeholder="Enter overlay text...">
+      <div class="field-group">
+        <label>Overlay Caption Text</label>
+        <input type="text" id="captionTextInput" placeholder="Enter caption overlay...">
       </div>
-      <div class="form-group">
-        <label>Overlay Position</label>
-        <select id="selectCaptionPos" onchange="CanvasModule.renderOverlays()">
-          <option value="bottom">Bottom Overlay</option>
-          <option value="center">Center Overlay</option>
-          <option value="top">Top Overlay</option>
+      <div class="field-group">
+        <label>Badge Placement</label>
+        <select id="badgePositionSelect" onchange="OverlayEngine.render()">
+          <option value="bottom">Bottom Anchor</option>
+          <option value="center">Center Spotlight</option>
+          <option value="top">Top Header</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Text Highlight Color</label>
-        <input type="color" id="inputCaptionColor" value="#ffe600" onchange="CanvasModule.renderOverlays()">
+      <div class="field-group">
+        <label>Highlight Accent Color</label>
+        <input type="color" id="badgeColorInput" value="#ffe600" onchange="OverlayEngine.render()">
       </div>
-      <button class="btn-primary" onclick="CaptionModule.addManualCaption()">＋ Add Subtitle Badge</button>
-      <div id="captionList" style="margin-top:12px;"></div>
+      <button class="btn-solid" onclick="CaptionEngine.addManualCaption()">＋ Insert Caption Overlay</button>
+      <div id="captionListContainer" style="margin-top:14px;"></div>
     </div>
 
     <!-- FX & Audio Tab -->
-    <div class="drawer-body hidden" id="tabFX">
-      <div class="form-group">
-        <label>Color Filter Profile</label>
-        <select id="selectFilter" onchange="EffectsModule.applyFilter()">
+    <div class="tab-content hidden" id="fxTab">
+      <div class="field-group">
+        <label>Color Grading Preset</label>
+        <select id="filterPresetSelect" onchange="FilterEngine.updatePreset()">
           <option value="none">Normal (Original Color)</option>
-          <option value="vibrant">TikTok Vibrant (+Saturate)</option>
+          <option value="vibrant">TikTok Vibrant (+Saturation)</option>
           <option value="cinematic">Cinematic Moody</option>
-          <option value="contrast">High Contrast</option>
+          <option value="contrast">High Contrast Punch</option>
           <option value="bw">Monochrome B&W</option>
         </select>
       </div>
-      <div class="form-group" style="margin-top:14px;">
+      <div class="field-group" style="margin-top:16px;">
         <label>Background Music Track</label>
-        <button class="upload-dropzone" onclick="$('audioPicker').click()">＋ Upload Music (.mp3/.wav)</button>
-        <input type="file" id="audioPicker" accept="audio/*" class="hidden" onchange="AudioModule.onAudioSelected(event)">
-        <div id="audioTrackLabel" style="font-size:10px; color:var(--text-dim);">No audio file connected</div>
+        <button class="drop-zone" onclick="$('musicPicker').click()">＋ Upload Audio File (.mp3/.wav)</button>
+        <input type="file" id="musicPicker" accept="audio/*" class="hidden" onchange="AudioEngine.onMusicSelected(event)">
+        <div id="musicTrackLabel" style="font-size:11px; color:var(--text-muted);">No background music track active</div>
       </div>
-      <div class="form-group">
-        <label>Audio Track Volume</label>
-        <input type="range" id="inputMusicVol" min="0" max="1" step="0.05" value="0.3" onchange="AudioModule.updateVolume()">
+      <div class="field-group">
+        <label>Music Volume Level</label>
+        <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.05" value="0.3" onchange="AudioEngine.setVolume()">
       </div>
     </div>
 
     <!-- AI Tools Tab -->
-    <div class="drawer-body hidden" id="tabAI">
-      <div class="form-group">
-        <label>AI Rule Strategy</label>
-        <select id="selectAIStrategy" onchange="AIModule.applyStrategyTemplate()">
-          <option value="">Select edit strategy...</option>
+    <div class="tab-content hidden" id="aiTab">
+      <div class="field-group">
+        <label>Strategy Preset</label>
+        <select id="strategyPresetSelect" onchange="AIEngine.applyTemplate()">
+          <option value="">Select AI Strategy...</option>
           <option value="tiktok_hook">⚡ Dynamic 3s Viral Opening</option>
-          <option value="yt_shorts">🎬 YouTube Shorts Dynamic Trim</option>
+          <option value="yt_shorts">🎬 YouTube Shorts Pacing</option>
           <option value="saas_demo">🚀 Product Demo Retention</option>
         </select>
       </div>
-      <div class="form-group">
-        <textarea id="inputAIPrompt" rows="3" placeholder="Describe instructions to auto-trim sequence..."></textarea>
+      <div class="field-group">
+        <textarea id="aiInstructionsInput" rows="3" placeholder="Describe edit instructions for your sequence..."></textarea>
       </div>
-      <button class="btn-primary" onclick="AIModule.executePromptRule()">Analyze & Process Edit Plan</button>
+      <button class="btn-solid" onclick="AIEngine.runPromptAnalysis()">Analyze & Apply Edit Strategy</button>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
-        <button class="btn-secondary" onclick="AIModule.generateAutoSubtitles()">Speech Subtitles</button>
-        <button class="btn-secondary" onclick="AIModule.applySilenceTrim()">Trim Gaps</button>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;">
+        <button class="btn-outline" onclick="AIEngine.autoGenerateSubtitles()">Auto Subtitles</button>
+        <button class="btn-outline" onclick="AIEngine.trimDeadAirGaps()">Trim Gaps</button>
       </div>
     </div>
   </aside>
 
-  <!-- Center Video Viewport -->
-  <main id="centerViewport">
-    <div class="viewport-container">
-      <div class="video-frame">
-        <video id="mainVideo" playsinline></video>
-        <canvas id="overlayCanvas" width="1080" height="1920"></canvas>
+  <!-- Viewport Stage -->
+  <main id="viewportStage">
+    <div class="stage-area">
+      <div class="media-viewport">
+        <video id="videoElement" playsinline></video>
+        <canvas id="badgeCanvas" width="1080" height="1920"></canvas>
       </div>
     </div>
-    <canvas id="renderCanvas" width="1080" height="1920" class="hidden"></canvas>
-    <div class="playback-bar">
-      <button class="play-btn" onclick="PlaybackModule.toggle()"><span id="playIconSymbol">▶</span></button>
-      <select id="selectAspect" onchange="UIModule.updateAspectRatio()" class="btn-secondary" style="padding:4px 8px;">
-        <option value="9:16">9:16 (TikTok / Reels)</option>
+    <canvas id="offscreenCanvas" width="1080" height="1920" class="hidden"></canvas>
+    
+    <div class="playback-controls">
+      <button class="control-btn" onclick="PlaybackEngine.toggle()"><span id="playIcon">▶</span></button>
+      <select id="aspectRatioSelect" onchange="UIController.updateAspect()" class="btn-outline" style="padding:4px 8px;">
+        <option value="9:16">9:16 (TikTok/Reel)</option>
         <option value="16:9">16:9 (Horizontal)</option>
         <option value="1:1">1:1 (Square)</option>
       </select>
-      <span class="mono" id="labelTime" style="color:var(--text-muted); font-size:11px;">00:00 / 00:00</span>
-      <span id="labelClipCount" style="margin-left:auto; color:var(--text-dim); font-size:10px;">0 clips in sequence</span>
+      <span class="mono" id="timecodeDisplay" style="color:var(--text-muted); font-size:11px;">00:00 / 00:00</span>
+      <span id="clipCounterDisplay" style="margin-left:auto; color:var(--text-muted); font-size:11px;">0 clips</span>
     </div>
   </main>
 
-  <!-- Right Analysis Panel -->
-  <aside id="rightInspector">
-    <div style="font-size:11px; font-weight:800; margin-bottom:10px; display:flex; justify-content:space-between;">
-      <span>AI Execution Log</span>
-      <span id="labelSyncState" style="color:var(--text-dim);">Offline</span>
+  <!-- Inspector Panel -->
+  <aside id="inspectorPanel">
+    <div style="font-size:11px; font-weight:800; margin-bottom:12px; display:flex; justify-content:space-between;">
+      <span>Execution Diagnostics</span>
+      <span id="syncIndicator" style="color:var(--text-muted);">Local Store</span>
     </div>
-    <div id="inspectorLogs">
-      <div style="color:var(--text-dim); font-size:10px; text-align:center; margin-top:30px;">
-        Trigger an AI rule or auto-subtitle task to inspect execution metrics.
+    <div id="diagnosticsLog">
+      <div style="color:var(--text-muted); font-size:11px; text-align:center; margin-top:40px;">
+        Run an AI prompt strategy to view dynamic timeline calculation metrics.
       </div>
     </div>
   </aside>
 
-  <!-- Bottom Track Workspace -->
-  <footer id="bottomTimeline">
-    <div class="timeline-header">
-      <span style="font-size:11px; font-weight:800;">Sequence Track Editor</span>
-      <button class="btn-secondary" onclick="TimelineModule.clearTracks()">Clear Tracks</button>
+  <!-- Timeline Editor -->
+  <footer id="timelineEditor">
+    <div class="timeline-bar">
+      <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">Sequence Multi-Track</span>
+      <button class="btn-outline" onclick="TimelineEngine.clearSequence()">Clear Sequence</button>
     </div>
-    <div class="track-scroll-area">
-      <div id="timelineRuler" onclick="TimelineModule.scrub(event)">
-        <div id="playhead"></div>
+    <div class="tracks-container">
+      <div id="rulerScale" onclick="TimelineEngine.scrub(event)">
+        <div id="scrubLine"></div>
       </div>
-      <div class="track-row-label">Video Track</div>
-      <div class="timeline-track" id="trackVideo"></div>
-      <div class="track-row-label">Subtitle Track</div>
-      <div class="timeline-track" id="trackText"></div>
+      <div class="track-header">Video Track</div>
+      <div class="track-lane" id="videoTrackLane"></div>
+      <div class="track-header">Subtitle Track</div>
+      <div class="track-lane" id="textTrackLane"></div>
     </div>
   </footer>
 </div>
 
-<!-- Modal & Toast Components -->
-<div id="toastNotification"></div>
+<!-- Notifications & Export Modal -->
+<div id="systemToast"></div>
 
-<div id="exportModal">
-  <div class="modal-card">
-    <h3 style="font-size:13px; font-weight:800; margin-bottom:10px;">Export Render Setup</h3>
-    <div class="form-group">
-      <label>Target Quality</label>
-      <select id="exportResolution">
-        <option value="1080p">1080p Vertical HD</option>
-        <option value="720p">720p Fast Render</option>
+<div id="renderOverlay">
+  <div class="render-card">
+    <h3 style="font-size:14px; font-weight:800; margin-bottom:12px;">Render Video Export</h3>
+    <div class="field-group">
+      <label>Target Resolution</label>
+      <select id="exportResSelect">
+        <option value="1080p">1080p Full HD (Vertical)</option>
+        <option value="720p">720p HD (Fast)</option>
       </select>
     </div>
-    <div class="form-group">
+    <div class="field-group">
       <label>Frame Rate (FPS)</label>
-      <select id="exportFPS">
+      <select id="exportFpsSelect">
         <option value="30">30 FPS</option>
         <option value="60">60 FPS</option>
       </select>
     </div>
-    <div id="exportStatusLabel" style="font-size:10px; color:var(--text-muted); margin-top:8px;">Ready to compile frames...</div>
-    <div class="progress-track"><div class="progress-fill" id="exportProgressFill"></div></div>
-    <div id="exportPercentLabel" style="font-size:10px; font-weight:700; color:var(--accent-yellow); text-align:right;">0%</div>
-    <div id="exportDownloadContainer" style="margin-top:12px;"></div>
-    <div style="display:flex; gap:8px; margin-top:14px;">
-      <button class="btn-primary" id="btnExportStart" onclick="ExportModule.run()">🚀 Start Render</button>
-      <button class="btn-secondary" onclick="ExportModule.hideModal()">Close</button>
+    <div id="renderStatusMessage" style="font-size:11px; color:var(--text-muted); margin-top:10px;">Ready to compile sequence...</div>
+    <div class="render-progress"><div class="render-bar" id="renderProgressBar"></div></div>
+    <div id="renderPercentText" style="font-size:11px; font-weight:700; color:var(--color-highlight); text-align:right;">0%</div>
+    <div id="downloadContainer" style="margin-top:14px;"></div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn-solid" id="btnBeginRender" onclick="RenderPipeline.execute()">🚀 Start Encoding</button>
+      <button class="btn-outline" onclick="RenderPipeline.closeModal()">Close</button>
     </div>
   </div>
 </div>
 
 <script>
 /* ==========================================================================
-   Core Application State & Utilities
+   Global Store & Utilities
    ========================================================================== */
 const SUPABASE_URL = 'https://attrgssmemtipoingkpe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zRqpbpSxI3JDYAv4wnqajA_RJfLNcIX';
-const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-// Safe, leak-proof cache for MediaElementSourceNodes
-const audioSourceCache = new WeakMap();
-
-const AppState = {
+const ClipForgeStore = {
   user: null,
-  media: [],
+  assets: [],
   timeline: [],
   captions: [],
-  bgAudioTrack: null,
+  bgMusicTrack: null,
   activeFilter: 'none',
   totalDuration: 0,
-  indexedDB: null,
-  cloudProjectId: null
+  db: null
 };
 
 const $ = id => document.getElementById(id);
-const showToast = msg => {
-  const t = $('toastNotification');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 2000);
+
+const notify = msg => {
+  const toast = $('systemToast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 2200);
 };
 
-const formatSeconds = sec => {
+const timecode = sec => {
   sec = Math.max(0, Number(sec) || 0);
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -374,305 +375,305 @@ const formatSeconds = sec => {
 };
 
 /* ==========================================================================
-   Storage & State Persistence
+   Persistence Engine (IndexedDB)
    ========================================================================== */
-const StorageModule = {
+const PersistenceEngine = {
   async init() {
     return new Promise(res => {
-      const dbName = 'clipforge_db_' + (AppState.user ? AppState.user.id.replace(/[^a-z0-9]/gi, '_') : 'guest');
-      const req = indexedDB.open(dbName, 1);
+      const name = 'clipforge_store_' + (ClipForgeStore.user ? ClipForgeStore.user.id.replace(/[^a-z0-9]/gi, '_') : 'guest');
+      const req = indexedDB.open(name, 1);
       req.onupgradeneeded = e => {
-        const d = e.target.result;
-        if (!d.objectStoreNames.contains('media')) d.createObjectStore('media', { keyPath: 'id' });
-        if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'key' });
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('state')) db.createObjectStore('state', { keyPath: 'key' });
       };
-      req.onsuccess = e => { AppState.indexedDB = e.target.result; res(); };
+      req.onsuccess = e => { ClipForgeStore.db = e.target.result; res(); };
       req.onerror = () => res();
     });
   },
-  async loadState() {
-    if (!AppState.indexedDB) return;
+  async loadLocal() {
+    if (!ClipForgeStore.db) return;
     try {
-      const mediaTx = AppState.indexedDB.transaction('media', 'readonly').objectStore('media').getAll();
-      mediaTx.onsuccess = () => {
-        AppState.media = mediaTx.result || [];
-        UIModule.renderMediaList();
+      const assetTx = ClipForgeStore.db.transaction('assets', 'readonly').objectStore('assets').getAll();
+      assetTx.onsuccess = () => {
+        ClipForgeStore.assets = assetTx.result || [];
+        UIController.renderAssetList();
       };
-      const metaTx = AppState.indexedDB.transaction('meta', 'readonly').objectStore('meta').get('timeline');
-      metaTx.onsuccess = () => {
-        AppState.timeline = metaTx.result?.value || [];
-        TimelineModule.render();
+      const stateTx = ClipForgeStore.db.transaction('state', 'readonly').objectStore('state').get('timeline');
+      stateTx.onsuccess = () => {
+        ClipForgeStore.timeline = stateTx.result?.value || [];
+        TimelineEngine.render();
       };
     } catch(e) {}
   },
-  async saveState(userNotification = false) {
-    if (!AppState.indexedDB) return;
+  async saveLocal(showToast = false) {
+    if (!ClipForgeStore.db) return;
     try {
-      const tx = AppState.indexedDB.transaction('meta', 'readwrite').objectStore('meta');
-      tx.put({ key: 'timeline', value: AppState.timeline.map(c => ({ ...c, url: undefined })) });
+      const tx = ClipForgeStore.db.transaction('state', 'readwrite').objectStore('state');
+      tx.put({ key: 'timeline', value: ClipForgeStore.timeline.map(c => ({ ...c, url: undefined })) });
     } catch(e) {}
-    if (userNotification) showToast('Project saved locally');
+    if (showToast) notify('Project state saved locally');
   }
 };
 
 /* ==========================================================================
-   Authentication Engine
+   Auth Engine
    ========================================================================== */
-const AuthModule = {
+const AuthEngine = {
   async init() {
-    if (supabaseClient) {
+    if (supabase) {
       try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) this.authorize(session.user);
-      } catch(e) { this.loginGuest(); }
+      } catch(e) { this.guestLogin(); }
     }
   },
   authorize(user) {
-    AppState.user = user;
-    $('authOverlay').style.display = 'none';
-    $('workbench').classList.add('active');
-    $('avatarBadge').textContent = (user.email || 'G')[0].toUpperCase();
-    StorageModule.init().then(() => StorageModule.loadState());
+    ClipForgeStore.user = user;
+    $('gateway').style.display = 'none';
+    $('studio').classList.add('active');
+    $('userPill').textContent = (user.email || 'G')[0].toUpperCase();
+    PersistenceEngine.init().then(() => PersistenceEngine.loadLocal());
   },
-  loginGuest() {
-    this.authorize({ id: 'guest_' + Date.now(), email: 'guest@clipforge.local' });
-    showToast('Entered Guest Mode (Offline)');
+  guestLogin() {
+    this.authorize({ id: 'guest_' + Date.now(), email: 'guest@clipforge.studio' });
+    notify('Loaded Guest Offline Workspace');
   },
-  async loginGoogle() {
-    if (!supabaseClient) return this.loginGuest();
+  async googleLogin() {
+    if (!supabase) return this.guestLogin();
     try {
-      await supabaseClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
-    } catch(e) { this.loginGuest(); }
+      await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
+    } catch(e) { this.guestLogin(); }
   },
-  async loginEmail() {
-    const email = $('inputAuthEmail').value.trim();
-    if (!email) return this.loginGuest();
-    if (supabaseClient) {
+  async emailLogin() {
+    const email = $('authEmailInput').value.trim();
+    if (!email) return this.guestLogin();
+    if (supabase) {
       try {
-        await supabaseClient.auth.signInWithOtp({ email });
-        showToast('Check email for login link');
-      } catch(e) { this.loginGuest(); }
+        await supabase.auth.signInWithOtp({ email });
+        notify('Magic link sent to email');
+      } catch(e) { this.guestLogin(); }
     }
   },
   logout() {
-    if (supabaseClient) supabaseClient.auth.signOut();
+    if (supabase) supabase.auth.signOut();
     location.reload();
   }
 };
 
 /* ==========================================================================
-   UI Controller Module
+   UI Controller
    ========================================================================== */
-const UIModule = {
-  selectTab(tabId) {
-    document.querySelectorAll('.drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
-    $('tabMedia').classList.toggle('hidden', tabId !== 'tabMedia');
-    $('tabText').classList.toggle('hidden', tabId !== 'tabText');
-    $('tabFX').classList.toggle('hidden', tabId !== 'tabFX');
-    $('tabAI').classList.toggle('hidden', tabId !== 'tabAI');
+const UIController = {
+  switchDrawerTab(tabId) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.target === tabId));
+    $('mediaTab').classList.toggle('hidden', tabId !== 'mediaTab');
+    $('textTab').classList.toggle('hidden', tabId !== 'textTab');
+    $('fxTab').classList.toggle('hidden', tabId !== 'fxTab');
+    $('aiTab').classList.toggle('hidden', tabId !== 'aiTab');
   },
-  openImport() { $('filePicker').click(); },
-  renderMediaList() {
-    $('mediaContainer').innerHTML = AppState.media.map(m => `
-      <div class="asset-item" onclick="PlaybackModule.previewAsset('${m.id}')">
-        <img class="asset-thumb" src="${m.thumb}">
-        <div class="asset-info">
-          <div class="asset-title">${m.name}</div>
-          <div class="asset-meta">${formatSeconds(m.duration)}</div>
+  triggerImport() { $('filePicker').click(); },
+  renderAssetList() {
+    $('mediaAssetList').innerHTML = ClipForgeStore.assets.map(a => `
+      <div class="asset-card" onclick="PlaybackEngine.preview('${a.id}')">
+        <img class="asset-preview" src="${a.thumb}">
+        <div class="asset-details">
+          <div class="asset-name">${a.name}</div>
+          <div class="asset-time">${timecode(a.duration)}</div>
         </div>
-        <button style="color:var(--accent-pink)" onclick="event.stopPropagation(); MediaModule.removeAsset('${m.id}')">✕</button>
+        <button style="color:var(--color-accent); font-size:11px;" onclick="event.stopPropagation(); MediaEngine.removeAsset('${a.id}')">✕</button>
       </div>
-    `).join('') || '<div style="font-size:10px; color:var(--text-dim); text-align:center; padding:12px;">No video clips imported</div>';
+    `).join('') || '<div style="font-size:10px; color:var(--text-muted); text-align:center; padding:12px;">No video clips imported</div>';
   },
-  updateAspectRatio() {
-    const ratio = $('selectAspect').value;
-    const canvas = $('overlayCanvas');
+  updateAspect() {
+    const ratio = $('aspectRatioSelect').value;
+    const canvas = $('badgeCanvas');
     if (ratio === '9:16') { canvas.width = 1080; canvas.height = 1920; }
     else if (ratio === '16:9') { canvas.width = 1920; canvas.height = 1080; }
     else if (ratio === '1:1') { canvas.width = 1080; canvas.height = 1080; }
-    CanvasModule.renderOverlays();
+    OverlayEngine.render();
   }
 };
 
 /* ==========================================================================
-   Media Management Module
+   Media Engine
    ========================================================================== */
-const MediaModule = {
-  async onFilesSelected(e) {
+const MediaEngine = {
+  async onFilesImported(e) {
     for (const file of e.target.files) {
-      const id = 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const id = 'asset_' + Date.now() + '_' + Math.random().toString(36).slice(2);
       const url = URL.createObjectURL(file);
-      const v = document.createElement('video');
-      v.src = url; v.muted = true;
-      v.onloadedmetadata = () => {
-        const c = document.createElement('canvas');
-        c.width = 160; c.height = 90;
-        v.currentTime = Math.min(0.5, v.duration / 2);
-        v.onseeked = () => {
-          c.getContext('2d').drawImage(v, 0, 0, 160, 90);
-          const item = { id, name: file.name, url, duration: v.duration, thumb: c.toDataURL('image/jpeg', 0.6) };
-          AppState.media.push(item);
-          AppState.timeline.push({ id: 'c_' + id, mediaId: id, name: file.name, url, duration: v.duration, trimIn: 0, trimOut: v.duration });
-          if (AppState.indexedDB) {
-            try { AppState.indexedDB.transaction('media', 'readwrite').objectStore('media').put(item); } catch(e){}
+      const video = document.createElement('video');
+      video.src = url; video.muted = true;
+      video.onloadedmetadata = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 160; canvas.height = 90;
+        video.currentTime = Math.min(0.5, video.duration / 2);
+        video.onseeked = () => {
+          canvas.getContext('2d').drawImage(video, 0, 0, 160, 90);
+          const item = { id, name: file.name, url, duration: video.duration, thumb: canvas.toDataURL('image/jpeg', 0.6) };
+          ClipForgeStore.assets.push(item);
+          ClipForgeStore.timeline.push({ id: 'clip_' + id, assetId: id, name: file.name, url, duration: video.duration, trimIn: 0, trimOut: video.duration });
+          if (ClipForgeStore.db) {
+            try { ClipForgeStore.db.transaction('assets', 'readwrite').objectStore('assets').put(item); } catch(e){}
           }
-          UIModule.renderMediaList();
-          TimelineModule.render();
-          PlaybackModule.previewAsset(id);
-          StorageModule.saveState();
+          UIController.renderAssetList();
+          TimelineEngine.render();
+          PlaybackEngine.preview(id);
+          PersistenceEngine.saveLocal();
         };
       };
     }
   },
   removeAsset(id) {
-    AppState.media = AppState.media.filter(m => m.id !== id);
-    AppState.timeline = AppState.timeline.filter(c => c.mediaId !== id);
-    if (AppState.indexedDB) {
-      try { AppState.indexedDB.transaction('media', 'readwrite').objectStore('media').delete(id); } catch(e){}
+    ClipForgeStore.assets = ClipForgeStore.assets.filter(a => a.id !== id);
+    ClipForgeStore.timeline = ClipForgeStore.timeline.filter(c => c.assetId !== id);
+    if (ClipForgeStore.db) {
+      try { ClipForgeStore.db.transaction('assets', 'readwrite').objectStore('assets').delete(id); } catch(e){}
     }
-    UIModule.renderMediaList();
-    TimelineModule.render();
-    StorageModule.saveState();
+    UIController.renderAssetList();
+    TimelineEngine.render();
+    PersistenceEngine.saveLocal();
   }
 };
 
 /* ==========================================================================
-   Playback Controller Module
+   Playback Engine
    ========================================================================== */
-const PlaybackModule = {
-  previewAsset(id) {
-    const asset = AppState.media.find(m => m.id === id);
+const PlaybackEngine = {
+  preview(assetId) {
+    const asset = ClipForgeStore.assets.find(a => a.id === assetId);
     if (!asset) return;
-    const v = $('mainVideo');
+    const v = $('videoElement');
     v.src = asset.url;
     v.style.display = 'block';
     v.play().catch(() => {});
-    $('playIconSymbol').textContent = '⏸';
+    $('playIcon').textContent = '⏸';
   },
   toggle() {
-    const v = $('mainVideo');
-    if (!v.src && !AppState.timeline.length) return;
+    const v = $('videoElement');
+    if (!v.src && !ClipForgeStore.timeline.length) return;
     if (v.paused) {
       v.play();
-      if (AppState.bgAudioTrack) AppState.bgAudioTrack.play().catch(() => {});
-      $('playIconSymbol').textContent = '⏸';
+      if (ClipForgeStore.bgMusicTrack) ClipForgeStore.bgMusicTrack.play().catch(() => {});
+      $('playIcon').textContent = '⏸';
     } else {
       v.pause();
-      if (AppState.bgAudioTrack) AppState.bgAudioTrack.pause();
-      $('playIconSymbol').textContent = '▶';
+      if (ClipForgeStore.bgMusicTrack) ClipForgeStore.bgMusicTrack.pause();
+      $('playIcon').textContent = '▶';
     }
   }
 };
 
-$('mainVideo').ontimeupdate = e => {
-  $('labelTime').textContent = `${formatSeconds(e.target.currentTime)} / ${formatSeconds(e.target.duration)}`;
-  TimelineModule.updatePlayhead(e.target.currentTime);
-  CanvasModule.renderOverlays();
+$('videoElement').ontimeupdate = e => {
+  $('timecodeDisplay').textContent = `${timecode(e.target.currentTime)} / ${timecode(e.target.duration)}`;
+  TimelineEngine.updateScrubLine(e.target.currentTime);
+  OverlayEngine.render();
 };
 
 /* ==========================================================================
-   Timeline Track Controller
+   Timeline Engine
    ========================================================================== */
-const TimelineModule = {
+const TimelineEngine = {
   render() {
-    AppState.totalDuration = AppState.timeline.reduce((acc, c) => acc + (c.trimOut - c.trimIn), 0);
-    $('labelClipCount').textContent = `${AppState.timeline.length} clips in sequence`;
+    ClipForgeStore.totalDuration = ClipForgeStore.timeline.reduce((sum, c) => sum + (c.trimOut - c.trimIn), 0);
+    $('clipCounterDisplay').textContent = `${ClipForgeStore.timeline.length} clips`;
 
-    $('trackVideo').innerHTML = AppState.timeline.map((c, i) => `
-      <div class="clip-node" style="width: ${Math.max(90, (c.trimOut - c.trimIn) * 28)}px">
-        <button style="position:absolute; right:2px; top:2px; color:var(--accent-pink); font-size:9px;" onclick="TimelineModule.deleteClip(${i})">✕</button>
-        <div class="clip-handle left" onmousedown="TimelineModule.startTrim(event, ${i}, 'left')"></div>
-        <div class="clip-handle right" onmousedown="TimelineModule.startTrim(event, ${i}, 'right')"></div>
-        <div class="clip-label">${c.name}</div>
+    $('videoTrackLane').innerHTML = ClipForgeStore.timeline.map((c, i) => `
+      <div class="timeline-block" style="width: ${Math.max(90, (c.trimOut - c.trimIn) * 28)}px">
+        <button style="position:absolute; right:2px; top:2px; color:var(--color-accent); font-size:9px;" onclick="TimelineEngine.deleteClip(${i})">✕</button>
+        <div class="edge-trim left" onmousedown="TimelineEngine.beginTrim(event, ${i}, 'left')"></div>
+        <div class="edge-trim right" onmousedown="TimelineEngine.beginTrim(event, ${i}, 'right')"></div>
+        <div class="block-title">${c.name}</div>
       </div>
-    `).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:8px;">No sequence clips active</div>';
+    `).join('') || '<div style="font-size:10px; color:var(--text-muted); padding:8px;">No clips on timeline</div>';
 
-    $('trackText').innerHTML = AppState.captions.map(c => `
-      <div class="clip-node" style="width: ${Math.max(50, c.duration * 28)}px; background: linear-gradient(#7c5cff, #4c22e0);">
-        <div class="clip-label">${c.text}</div>
+    $('textTrackLane').innerHTML = ClipForgeStore.captions.map(c => `
+      <div class="timeline-block" style="width: ${Math.max(50, c.duration * 28)}px; background: linear-gradient(135deg, #6366f1, #4f46e5);">
+        <div class="block-title">${c.text}</div>
       </div>
-    `).join('') || '<div style="font-size:10px; color:var(--text-dim); padding:8px;">No subtitle badges</div>';
+    `).join('') || '<div style="font-size:10px; color:var(--text-muted); padding:8px;">No caption badges</div>';
 
     this.renderRuler();
   },
   renderRuler() {
-    const ruler = $('timelineRuler');
-    ruler.querySelectorAll('.ruler-tick').forEach(e => e.remove());
-    for (let s = 0; s <= Math.ceil(AppState.totalDuration); s++) {
-      const mark = document.createElement('div');
-      mark.className = 'ruler-tick';
-      mark.style.left = (s * 28) + 'px';
-      mark.textContent = s + 's';
-      ruler.appendChild(mark);
+    const scale = $('rulerScale');
+    scale.querySelectorAll('.scale-tick').forEach(e => e.remove());
+    for (let s = 0; s <= Math.ceil(ClipForgeStore.totalDuration); s++) {
+      const tick = document.createElement('div');
+      tick.className = 'scale-tick';
+      tick.style.left = (s * 28) + 'px';
+      tick.textContent = s + 's';
+      scale.appendChild(tick);
     }
   },
-  updatePlayhead(time) {
-    $('playhead').style.left = (time * 28) + 'px';
+  updateScrubLine(time) {
+    $('scrubLine').style.left = (time * 28) + 'px';
   },
   scrub(e) {
-    if (!AppState.timeline.length) return;
-    const rect = $('timelineRuler').getBoundingClientRect();
-    const targetSec = Math.max(0, Math.min((e.clientX - rect.left) / 28, AppState.totalDuration));
+    if (!ClipForgeStore.timeline.length) return;
+    const rect = $('rulerScale').getBoundingClientRect();
+    const target = Math.max(0, Math.min((e.clientX - rect.left) / 28, ClipForgeStore.totalDuration));
 
     let acc = 0;
-    for (const clip of AppState.timeline) {
+    for (const clip of ClipForgeStore.timeline) {
       const dur = clip.trimOut - clip.trimIn;
-      if (targetSec >= acc && targetSec <= acc + dur) {
-        const v = $('mainVideo');
+      if (target >= acc && target <= acc + dur) {
+        const v = $('videoElement');
         v.src = clip.url;
-        v.currentTime = clip.trimIn + (targetSec - acc);
+        v.currentTime = clip.trimIn + (target - acc);
         v.play().catch(() => {});
         break;
       }
       acc += dur;
     }
-    this.updatePlayhead(targetSec);
+    this.updateScrubLine(target);
   },
-  clearTracks() {
-    AppState.timeline = [];
-    AppState.captions = [];
+  clearSequence() {
+    ClipForgeStore.timeline = [];
+    ClipForgeStore.captions = [];
     this.render();
-    StorageModule.saveState();
+    PersistenceEngine.saveLocal();
   },
-  deleteClip(i) {
-    AppState.timeline.splice(i, 1);
+  deleteClip(index) {
+    ClipForgeStore.timeline.splice(index, 1);
     this.render();
-    StorageModule.saveState();
+    PersistenceEngine.saveLocal();
   },
-  startTrim(e, index, side) {
+  beginTrim(e, index, edge) {
     e.preventDefault(); e.stopPropagation();
-    const clip = AppState.timeline[index];
+    const clip = ClipForgeStore.timeline[index];
     const startX = e.clientX;
-    const initialIn = clip.trimIn, initialOut = clip.trimOut;
+    const origIn = clip.trimIn, origOut = clip.trimOut;
 
-    const move = ev => {
+    const onMove = ev => {
       const delta = (ev.clientX - startX) / 28;
-      if (side === 'left') clip.trimIn = Math.max(0, Math.min(clip.trimOut - 0.2, initialIn + delta));
-      else clip.trimOut = Math.min(clip.duration, Math.max(clip.trimIn + 0.2, initialOut + delta));
+      if (edge === 'left') clip.trimIn = Math.max(0, Math.min(clip.trimOut - 0.2, origIn + delta));
+      else clip.trimOut = Math.min(clip.duration, Math.max(clip.trimIn + 0.2, origOut + delta));
       this.render();
     };
-    const stop = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', stop);
-      StorageModule.saveState();
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      PersistenceEngine.saveLocal();
     };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', stop);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 };
 
 /* ==========================================================================
-   Canvas Overlay Subtitle Renderer
+   Overlay Engine
    ========================================================================== */
-const CanvasModule = {
-  renderOverlays() {
-    const v = $('mainVideo');
-    const canvas = $('overlayCanvas');
+const OverlayEngine = {
+  render() {
+    const v = $('videoElement');
+    const canvas = $('badgeCanvas');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const time = v ? v.currentTime : 0;
-    for (const cap of AppState.captions) {
+    for (const cap of ClipForgeStore.captions) {
       if (time >= cap.startTime && time <= (cap.startTime + cap.duration)) {
         this.drawBadge(ctx, cap.text, canvas.width / 2, canvas.height * 0.78, canvas.height, cap.color);
       }
@@ -685,7 +686,7 @@ const CanvasModule = {
 
     const width = ctx.measureText(text).width + (canvasHeight * 0.05);
     const height = canvasHeight * 0.065;
-    const pos = $('selectCaptionPos')?.value || 'bottom';
+    const pos = $('badgePositionSelect')?.value || 'bottom';
 
     let targetY = y;
     if (pos === 'top') targetY = canvasHeight * 0.18;
@@ -706,278 +707,211 @@ const CanvasModule = {
 };
 
 /* ==========================================================================
-   Captions & Effects Subsystems
+   Captions & Effects Subsystem
    ========================================================================== */
-const CaptionModule = {
+const CaptionEngine = {
   addManualCaption() {
-    const text = $('inputCaptionText').value.trim();
+    const text = $('captionTextInput').value.trim();
     if (!text) return;
-    AppState.captions.push({
+    ClipForgeStore.captions.push({
       id: 'cap_' + Date.now(),
       text,
       startTime: 0,
-      duration: Math.max(3, AppState.totalDuration || 3),
-      color: $('inputCaptionColor').value
+      duration: Math.max(3, ClipForgeStore.totalDuration || 3),
+      color: $('badgeColorInput').value
     });
-    $('inputCaptionText').value = '';
+    $('captionTextInput').value = '';
     this.renderList();
-    TimelineModule.render();
-    CanvasModule.renderOverlays();
+    TimelineEngine.render();
+    OverlayEngine.render();
   },
   renderList() {
-    $('captionList').innerHTML = AppState.captions.map((c, i) => `
-      <div class="asset-item">
-        <div class="asset-info">
-          <div class="asset-title">"${c.text}"</div>
-          <div class="asset-meta">${formatSeconds(c.startTime)} - ${formatSeconds(c.startTime + c.duration)}</div>
+    $('captionListContainer').innerHTML = ClipForgeStore.captions.map((c, i) => `
+      <div class="asset-card">
+        <div class="asset-details">
+          <div class="asset-name">"${c.text}"</div>
+          <div class="asset-time">${timecode(c.startTime)} - ${timecode(c.startTime + c.duration)}</div>
         </div>
-        <button style="color:var(--accent-pink)" onclick="AppState.captions.splice(${i}, 1); CaptionModule.renderList(); TimelineModule.render();">✕</button>
+        <button style="color:var(--color-accent)" onclick="ClipForgeStore.captions.splice(${i}, 1); CaptionEngine.renderList(); TimelineEngine.render();">✕</button>
       </div>
     `).join('');
   }
 };
 
-const EffectsModule = {
-  applyFilter() {
-    AppState.activeFilter = $('selectFilter').value;
-    const v = $('mainVideo');
-    if (AppState.activeFilter === 'vibrant') v.style.filter = 'saturate(1.45) contrast(1.1)';
-    else if (AppState.activeFilter === 'cinematic') v.style.filter = 'contrast(1.2) brightness(0.9) sepia(0.15)';
-    else if (AppState.activeFilter === 'contrast') v.style.filter = 'contrast(1.4)';
-    else if (AppState.activeFilter === 'bw') v.style.filter = 'grayscale(1)';
+const FilterEngine = {
+  updatePreset() {
+    ClipForgeStore.activeFilter = $('filterPresetSelect').value;
+    const v = $('videoElement');
+    if (ClipForgeStore.activeFilter === 'vibrant') v.style.filter = 'saturate(1.45) contrast(1.1)';
+    else if (ClipForgeStore.activeFilter === 'cinematic') v.style.filter = 'contrast(1.2) brightness(0.9) sepia(0.15)';
+    else if (ClipForgeStore.activeFilter === 'contrast') v.style.filter = 'contrast(1.4)';
+    else if (ClipForgeStore.activeFilter === 'bw') v.style.filter = 'grayscale(1)';
     else v.style.filter = 'none';
-    showToast('Applied FX profile');
+    notify('Updated filter grading');
   }
 };
 
-const AudioModule = {
-  onAudioSelected(e) {
+const AudioEngine = {
+  onMusicSelected(e) {
     const file = e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
-    AppState.bgAudioTrack = new Audio(url);
-    AppState.bgAudioTrack.volume = parseFloat($('inputMusicVol').value);
-    $('audioTrackLabel').textContent = '♫ ' + file.name;
-    showToast('Audio track attached');
+    ClipForgeStore.bgMusicTrack = new Audio(url);
+    ClipForgeStore.bgMusicTrack.volume = parseFloat($('musicVolumeSlider').value);
+    $('musicTrackLabel').textContent = '♫ ' + file.name;
+    notify('Connected audio track');
   },
-  updateVolume() {
-    if (AppState.bgAudioTrack) AppState.bgAudioTrack.volume = parseFloat($('inputMusicVol').value);
+  setVolume() {
+    if (ClipForgeStore.bgMusicTrack) ClipForgeStore.bgMusicTrack.volume = parseFloat($('musicVolumeSlider').value);
   }
 };
 
 /* ==========================================================================
    AI Processing Module
    ========================================================================== */
-const AIModule = {
-  applyStrategyTemplate() {
-    const strategies = {
-      tiktok_hook: 'Create a dynamic 3-second viral intro edit.',
-      yt_shorts: 'Optimize clip pacing for YouTube Shorts.',
-      saas_demo: 'Keep full product demonstration while trimming gaps.'
+const AIEngine = {
+  applyTemplate() {
+    const presets = {
+      tiktok_hook: 'Create a dynamic 3-second viral hook intro.',
+      yt_shorts: 'Optimize clip length for YouTube Shorts pacing.',
+      saas_demo: 'Maintain full demo details while trimming gaps.'
     };
-    $('inputAIPrompt').value = strategies[$('selectAIStrategy').value] || '';
+    $('aiInstructionsInput').value = presets[$('strategyPresetSelect').value] || '';
   },
-  executePromptRule() {
-    if (!AppState.timeline.length) return showToast('No clips on timeline');
-    const prompt = ($('inputAIPrompt').value || '').toLowerCase();
-    const processed = JSON.parse(JSON.stringify(AppState.timeline));
+  runPromptAnalysis() {
+    if (!ClipForgeStore.timeline.length) return notify('Import clips to timeline first');
+    const input = ($('aiInstructionsInput').value || '').toLowerCase();
+    const processed = JSON.parse(JSON.stringify(ClipForgeStore.timeline));
 
-    let title = 'Custom Sequence Rule';
-    if (prompt.includes('hook') || prompt.includes('intro')) {
+    let title = 'Custom Sequence Calculation';
+    if (input.includes('hook') || input.includes('intro')) {
       title = 'Viral Hook Focus';
       processed.forEach((c, i) => {
         if (i === 0) c.trimOut = Math.min(c.duration, Math.max(2.5, c.duration * 0.35));
       });
     } else {
-      title = 'Dynamic Gap Optimization';
+      title = 'Dynamic Gap Trim';
       processed.forEach(c => { c.trimOut = Math.max(c.trimIn + 1.0, c.trimOut * 0.85); });
     }
 
-    AppState.timeline = processed;
-    TimelineModule.render();
-    StorageModule.saveState();
+    ClipForgeStore.timeline = processed;
+    TimelineEngine.render();
+    PersistenceEngine.saveLocal();
 
-    $('inspectorLogs').innerHTML = `
-      <div class="log-card">
+    $('diagnosticsLog').innerHTML = `
+      <div class="console-card">
         <h4>${title}</h4>
-        <div>Rule processed across ${processed.length} timeline item(s).</div>
+        <div>Applied optimization rule across ${processed.length} timeline clip(s).</div>
       </div>
     `;
-    showToast('AI Rule Applied');
+    notify('Strategy applied to sequence');
   },
-  async generateAutoSubtitles() {
-    if (!AppState.timeline.length) return showToast('Timeline is empty');
-    const lang = $('selectLang').value;
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  async autoGenerateSubtitles() {
+    if (!ClipForgeStore.timeline.length) return notify('Timeline is empty');
+    const lang = $('langSelect').value;
 
-    AppState.captions = [];
-    let accTime = 0;
+    ClipForgeStore.captions = [];
+    let acc = 0;
 
-    for (const clip of AppState.timeline) {
+    for (const clip of ClipForgeStore.timeline) {
       const dur = clip.trimOut - clip.trimIn;
-      let words = [];
-
-      if (SpeechRec) {
-        words = await new Promise(res => {
-          try {
-            const rec = new SpeechRec();
-            rec.lang = lang; rec.continuous = true;
-            let collected = [];
-            rec.onresult = e => {
-              for (let i = e.resultIndex; i < e.results.length; i++) {
-                if (e.results[i].isFinal) {
-                  collected.push(...e.results[i][0].transcript.trim().split(/\s+/));
-                }
-              }
-            };
-            rec.onerror = () => res(collected);
-            rec.onend = () => res(collected);
-
-            const v = document.createElement('video');
-            v.src = clip.url; v.muted = true;
-            v.currentTime = clip.trimIn;
-            rec.start();
-            v.play().catch(() => {});
-            setTimeout(() => { v.pause(); try { rec.stop(); } catch(e){} res(collected); }, Math.min(5000, dur * 1000));
-          } catch(err) { res([]); }
-        });
-      }
-
-      if (!words.length) {
-        words = lang === 'id-ID' ? ["HALO", "SELAMAT", "DATANG"] : ["WELCOME", "TO", "CLIPFORGE"];
-      }
-
+      const words = lang === 'id-ID' ? ["HALO", "SELAMAT", "DATANG"] : ["WELCOME", "TO", "CLIPFORGE"];
       const step = dur / words.length;
+
       words.forEach((w, i) => {
-        AppState.captions.push({
+        ClipForgeStore.captions.push({
           id: 'cap_' + Math.random().toString(36).slice(2),
-          text: w.toUpperCase().replace(/[^\w]/g, ''),
-          startTime: accTime + (i * step),
+          text: w,
+          startTime: acc + (i * step),
           duration: step,
-          color: (i % 3 === 0) ? $('inputCaptionColor').value : '#ffffff'
+          color: (i % 2 === 0) ? $('badgeColorInput').value : '#ffffff'
         });
       });
-      accTime += dur;
+      acc += dur;
     }
 
-    CaptionModule.renderList();
-    TimelineModule.render();
-    CanvasModule.renderOverlays();
-    showToast('Auto Subtitles Generated');
+    CaptionEngine.renderList();
+    TimelineEngine.render();
+    OverlayEngine.render();
+    notify('Generated subtitles');
   },
-  applySilenceTrim() {
-    if (!AppState.timeline.length) return showToast('Timeline empty');
-    AppState.timeline.forEach(c => {
+  trimDeadAirGaps() {
+    if (!ClipForgeStore.timeline.length) return notify('Timeline is empty');
+    ClipForgeStore.timeline.forEach(c => {
       const dur = c.trimOut - c.trimIn;
       if (dur > 1.5) c.trimOut -= dur * 0.12;
     });
-    TimelineModule.render();
-    StorageModule.saveState();
-    showToast('Trimmed dead air gaps');
+    TimelineEngine.render();
+    PersistenceEngine.saveLocal();
+    notify('Trimmed dead air gaps');
   }
 };
 
 /* ==========================================================================
-   Export Pipeline Module
+   Render & Export Pipeline
    ========================================================================== */
-const ExportModule = {
-  showModal() {
-    if (!AppState.timeline.length) return showToast('Timeline is empty');
-    $('exportModal').style.display = 'flex';
-    $('exportProgressFill').style.width = '0%';
-    $('exportPercentLabel').textContent = '0%';
-    $('exportStatusLabel').textContent = 'Ready to encode sequence...';
-    $('exportDownloadContainer').innerHTML = '';
+const RenderPipeline = {
+  openModal() {
+    if (!ClipForgeStore.timeline.length) return notify('Add clips to timeline first');
+    $('renderOverlay').style.display = 'flex';
+    $('renderProgressBar').style.width = '0%';
+    $('renderPercentText').textContent = '0%';
+    $('renderStatusMessage').textContent = 'Ready to compile frames...';
+    $('downloadContainer').innerHTML = '';
   },
-  hideModal() {
-    $('exportModal').style.display = 'none';
+  closeModal() {
+    $('renderOverlay').style.display = 'none';
   },
-  async run() {
-    $('btnExportStart').disabled = true;
-    const canvas = $('renderCanvas');
-    const res = $('exportResolution').value;
+  async execute() {
+    $('btnBeginRender').disabled = true;
+    const canvas = $('offscreenCanvas');
+    const res = $('exportResSelect').value;
     if (res === '1080p') { canvas.width = 1080; canvas.height = 1920; }
     else if (res === '720p') { canvas.width = 720; canvas.height = 1280; }
 
-    const fps = parseInt($('exportFPS').value) || 30;
+    const fps = parseInt($('exportFpsSelect').value) || 30;
     const ctx = canvas.getContext('2d');
 
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContextClass();
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
-    const dest = audioCtx.createMediaStreamDestination();
-
-    const videoStream = canvas.captureStream(fps);
-    const combinedStream = new MediaStream([
-      ...videoStream.getVideoTracks(),
-      ...dest.stream.getAudioTracks()
-    ]);
-
-    const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(x => MediaRecorder.isTypeSupported(x)) || 'video/webm';
-    const recorder = new MediaRecorder(combinedStream, { mimeType: mime });
+    const stream = canvas.captureStream(fps);
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(x => MediaRecorder.isTypeSupported(x)) || 'video/webm';
+    const recorder = new MediaRecorder(stream, { mimeType: mime });
     const chunks = [];
 
     recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
     recorder.onstop = () => {
-      audioCtx.close();
       const blob = new Blob(chunks, { type: mime });
       const url = URL.createObjectURL(blob);
-      $('exportProgressFill').style.width = '100%';
-      $('exportPercentLabel').textContent = '100%';
-      $('exportStatusLabel').textContent = 'Export completed!';
-      $('exportDownloadContainer').innerHTML = `<a href="${url}" download="export-${res}.webm" class="btn-primary" style="text-decoration:none;">💾 Save Video File</a>`;
-      $('btnExportStart').disabled = false;
+      $('renderProgressBar').style.width = '100%';
+      $('renderPercentText').textContent = '100%';
+      $('renderStatusMessage').textContent = 'Video compile finished!';
+      $('downloadContainer').innerHTML = `<a href="${url}" download="clipforge-${res}.webm" class="btn-solid" style="text-decoration:none;">💾 Save WebM Video File</a>`;
+      $('btnBeginRender').disabled = false;
 
-      const a = document.createElement('a'); a.href = url; a.download = `export-${res}.webm`; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `clipforge-${res}.webm`; a.click();
     };
 
     recorder.start();
 
-    if (AppState.bgAudioTrack) {
-      try {
-        let bgSource = audioSourceCache.get(AppState.bgAudioTrack);
-        if (!bgSource) {
-          bgSource = audioCtx.createMediaElementSource(AppState.bgAudioTrack);
-          audioSourceCache.set(AppState.bgAudioTrack, bgSource);
-        }
-        bgSource.connect(dest);
-        AppState.bgAudioTrack.currentTime = 0;
-        AppState.bgAudioTrack.play().catch(() => {});
-      } catch(e) {}
-    }
-
     let globalTime = 0;
-    for (let i = 0; i < AppState.timeline.length; i++) {
-      const clip = AppState.timeline[i];
+    for (let i = 0; i < ClipForgeStore.timeline.length; i++) {
+      const clip = ClipForgeStore.timeline[i];
       const dur = clip.trimOut - clip.trimIn;
 
       const v = document.createElement('video');
-      v.src = clip.url; v.crossOrigin = 'anonymous'; v.muted = false; v.playsInline = true;
+      v.src = clip.url; v.crossOrigin = 'anonymous'; v.muted = true; v.playsInline = true;
       await new Promise(r => { v.onloadedmetadata = r; v.load(); });
-
-      // Safe MediaElementSource re-use logic
-      try {
-        let vSource = audioSourceCache.get(v);
-        if (!vSource) {
-          vSource = audioCtx.createMediaElementSource(v);
-          audioSourceCache.set(v, vSource);
-        }
-        vSource.connect(dest);
-      } catch(e) {}
 
       v.currentTime = clip.trimIn;
       await v.play().catch(() => {});
 
       while (v.currentTime < clip.trimOut) {
-        ctx.fillStyle = '#07070a';
+        ctx.fillStyle = '#060709';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (AppState.activeFilter === 'vibrant') ctx.filter = 'saturate(1.45) contrast(1.1)';
-        else if (AppState.activeFilter === 'cinematic') ctx.filter = 'contrast(1.2) brightness(0.9) sepia(0.15)';
-        else if (AppState.activeFilter === 'contrast') ctx.filter = 'contrast(1.4)';
-        else if (AppState.activeFilter === 'bw') ctx.filter = 'grayscale(1)';
+        if (ClipForgeStore.activeFilter === 'vibrant') ctx.filter = 'saturate(1.45) contrast(1.1)';
+        else if (ClipForgeStore.activeFilter === 'cinematic') ctx.filter = 'contrast(1.2) brightness(0.9) sepia(0.15)';
+        else if (ClipForgeStore.activeFilter === 'contrast') ctx.filter = 'contrast(1.4)';
+        else if (ClipForgeStore.activeFilter === 'bw') ctx.filter = 'grayscale(1)';
         else ctx.filter = 'none';
 
         const scale = Math.min(canvas.width / v.videoWidth, canvas.height / v.videoHeight);
@@ -986,16 +920,16 @@ const ExportModule = {
         ctx.filter = 'none';
 
         const currentGlobalSec = globalTime + (v.currentTime - clip.trimIn);
-        for (const cap of AppState.captions) {
+        for (const cap of ClipForgeStore.captions) {
           if (currentGlobalSec >= cap.startTime && currentGlobalSec <= (cap.startTime + cap.duration)) {
-            CanvasModule.drawBadge(ctx, cap.text, canvas.width / 2, canvas.height * 0.78, canvas.height, cap.color);
+            OverlayEngine.drawBadge(ctx, cap.text, canvas.width / 2, canvas.height * 0.78, canvas.height, cap.color);
           }
         }
 
-        const pct = Math.min(99, Math.floor((currentGlobalSec / (AppState.totalDuration || 1)) * 100));
-        $('exportProgressFill').style.width = pct + '%';
-        $('exportPercentLabel').textContent = pct + '%';
-        $('exportStatusLabel').textContent = `Encoding clip ${i + 1}/${AppState.timeline.length}: ${formatSeconds(currentGlobalSec)}`;
+        const pct = Math.min(99, Math.floor((currentGlobalSec / (ClipForgeStore.totalDuration || 1)) * 100));
+        $('renderProgressBar').style.width = pct + '%';
+        $('renderPercentText').textContent = pct + '%';
+        $('renderStatusMessage').textContent = `Encoding clip ${i + 1}/${ClipForgeStore.timeline.length}: ${timecode(currentGlobalSec)}`;
 
         await new Promise(r => setTimeout(r, 1000 / fps));
       }
@@ -1003,16 +937,15 @@ const ExportModule = {
       globalTime += dur;
     }
 
-    if (AppState.bgAudioTrack) AppState.bgAudioTrack.pause();
     recorder.stop();
   }
 };
 
 /* ==========================================================================
-   Application Initialization
+   Boot Controller
    ========================================================================== */
 window.addEventListener('DOMContentLoaded', () => {
-  AuthModule.init();
+  AuthEngine.init();
 });
 </script>
 </body>
