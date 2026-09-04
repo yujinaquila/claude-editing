@@ -108,7 +108,7 @@ export default function HomePage() {
     return decodedAudio.getChannelData(0);
   };
 
-  // Real AI Pipeline Execution
+  // Client-Side AI Pipeline Execution
   const runAIPipeline = async () => {
     if (typeof window === "undefined") return;
     if (!videoFile) return alert("Please import a video first / Silakan impor video terlebih dahulu.");
@@ -129,27 +129,29 @@ export default function HomePage() {
       const transcriber = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny");
       
       setStatusMessage("Transcribing speech to captions...");
-      const output = await transcriber(audioBuffer, {
+      const rawOutput = await transcriber(audioBuffer, {
         chunk_length_s: 30,
         stride_length_s: 5,
         return_timestamps: true,
       });
 
+      const output = (Array.isArray(rawOutput) ? rawOutput[0] : rawOutput) as any;
+
       // Format generated transcript items into subtitle list
-      if (output && (output as any).chunks) {
-        const formattedCaptions = (output as any).chunks.map((chunk: any) => {
+      if (output && output.chunks && Array.isArray(output.chunks)) {
+        const formattedCaptions = output.chunks.map((chunk: any) => {
           const startSec = Math.floor(chunk.timestamp[0] || 0);
           const mins = Math.floor(startSec / 60).toString().padStart(2, "0");
           const secs = (startSec % 60).toString().padStart(2, "0");
           return {
             start: `00:${mins}:${secs}`,
-            text: chunk.text.trim()
+            text: chunk.text ? chunk.text.trim() : ""
           };
         });
         setSubtitles(formattedCaptions);
       } else {
         setSubtitles([
-          { start: "00:00:00", text: output.text || "Speech recognized successfully." }
+          { start: "00:00:00", text: output?.text ? String(output.text) : "Speech recognized successfully." }
         ]);
       }
 
@@ -174,7 +176,6 @@ export default function HomePage() {
     } catch (err) {
       console.error("AI Pipeline Error:", err);
       setStatusMessage("Processing completed with fallback captions.");
-      // Fallback captions if audio channel extraction fails on specific media codecs
       setSubtitles([
         { start: "00:00:00", text: "AI Auto-Hook Generated" },
         { start: "00:00:03", text: "Silence trimmed via FFmpeg WASM" }
@@ -189,11 +190,13 @@ export default function HomePage() {
       className="flex flex-col h-screen bg-[#1e1e1e] text-gray-200 font-sans select-none overflow-hidden"
       onClick={() => setActiveMenu(null)}
     >
+      {/* Top Header Menu Bar */}
       <header className="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
         <div className="flex items-center space-x-4">
           <span className="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
           
           <nav className="flex space-x-1 text-xs text-gray-300 relative">
+            {/* File Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "file" ? null : "file")}
@@ -220,6 +223,7 @@ export default function HomePage() {
               )}
             </div>
 
+            {/* Edit Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "edit" ? null : "edit")}
@@ -239,6 +243,7 @@ export default function HomePage() {
               )}
             </div>
 
+            {/* Sequence Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "sequence" ? null : "sequence")}
@@ -256,6 +261,7 @@ export default function HomePage() {
               )}
             </div>
 
+            {/* Graphics Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "graphics" ? null : "graphics")}
@@ -298,7 +304,9 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: Media & Control */}
         <div className="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-4">
           <div 
             onClick={() => fileInputRef.current?.click()}
@@ -360,6 +368,7 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Center Panel: Program Monitor */}
         <div className="flex-1 flex flex-col bg-[#141414]">
           <div className="flex-1 flex items-center justify-center p-4 relative">
             {videoUrl ? (
@@ -398,6 +407,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Bottom Panel: Timeline */}
       <div className="h-48 border-t border-[#333] bg-[#181818] flex flex-col">
         <div className="h-6 bg-[#222] border-b border-[#333] flex items-center px-3 text-[10px] text-gray-400 space-x-2">
           <Layers className="w-3 h-3" />
