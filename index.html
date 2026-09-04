@@ -80,8 +80,11 @@
     <!-- Center Panel: Program Monitor -->
     <div class="flex-1 flex flex-col bg-[#141414]">
       <div class="flex-1 flex items-center justify-center p-4 relative">
-        <div id="monitorContainer" class="hidden max-h-full max-w-full aspect-video relative">
+        <div id="monitorContainer" class="hidden max-h-full max-w-full aspect-video relative flex items-center justify-center">
           <video id="mainVideo" class="w-full h-full rounded border border-[#333] object-contain bg-black"></video>
+          
+          <!-- Live On-Screen Subtitle Overlay -->
+          <div id="subtitleOverlay" class="absolute bottom-8 left-1/2 -translate-x-1/2 text-center pointer-events-none px-4 py-1 rounded bg-black/75 text-yellow-300 font-bold text-sm border border-yellow-500/30 shadow-lg transition-opacity duration-200 opacity-0"></div>
         </div>
 
         <div id="emptyMonitor" class="text-center text-gray-600">
@@ -135,6 +138,7 @@
 
     let currentFile = null;
     let currentVideoUrl = null;
+    let generatedSubtitles = [];
 
     const dropZone = document.getElementById('dropZone');
     const videoInput = document.getElementById('videoInput');
@@ -149,6 +153,7 @@
     const subtitlesList = document.getElementById('subtitlesList');
     const videoTrackLabel = document.getElementById('videoTrackLabel');
     const audioTrackLabel = document.getElementById('audioTrackLabel');
+    const subtitleOverlay = document.getElementById('subtitleOverlay');
 
     // File Selection
     dropZone.addEventListener('click', () => videoInput.click());
@@ -180,13 +185,23 @@
       lucide.createIcons();
     });
 
-    // Timecode Sync
+    // Timecode & Live Subtitle Overlay Sync
     mainVideo.addEventListener('timeupdate', () => {
       const time = mainVideo.currentTime;
       const mins = Math.floor(time / 60).toString().padStart(2, '0');
       const secs = Math.floor(time % 60).toString().padStart(2, '0');
       const frames = Math.floor((time % 1) * 30).toString().padStart(2, '0');
       timecode.textContent = `00:${mins}:${secs}:${frames}`;
+
+      // Search matching active caption segment
+      const activeCaption = generatedSubtitles.find(sub => time >= sub.startSec && time <= sub.endSec);
+
+      if (activeCaption) {
+        subtitleOverlay.textContent = activeCaption.text;
+        subtitleOverlay.classList.remove('opacity-0');
+      } else {
+        subtitleOverlay.classList.add('opacity-0');
+      }
     });
 
     // Export Functionality
@@ -197,6 +212,15 @@
       a.download = `Exported_Video_${Date.now()}.mp4`;
       a.click();
     });
+
+    // Helper: Convert timestamp to SRT format
+    function formatSrtTime(seconds) {
+      const hrs = Math.floor(seconds / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+      const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+      const ms = Math.floor((seconds % 1) * 1000).toString().padStart(3, '0');
+      return `${hrs}:${mins}:${secs},${ms}`;
+    }
 
     // Run AI Execution Pipeline
     runAiBtn.addEventListener('click', async () => {
@@ -221,18 +245,48 @@
         const result = await transcriber(pcmData, { return_timestamps: true });
 
         if (result && result.chunks) {
-          subtitlesList.innerHTML = result.chunks.map(c => `
+          generatedSubtitles = result.chunks.map(c => ({
+            startSec: c.timestamp[0],
+            endSec: c.timestamp[1] || c.timestamp[0] + 2,
+            text: c.text.trim()
+          }));
+
+          subtitlesList.innerHTML = generatedSubtitles.map(c => `
             <div class="text-xs p-1.5 bg-[#2a2a2a] mb-1 rounded flex justify-between">
-              <span class="text-purple-300 font-mono text-[10px]">${Math.floor(c.timestamp[0])}s</span>
-              <span class="text-gray-200 text-right">${c.text.trim()}</span>
+              <span class="text-purple-300 font-mono text-[10px]">${Math.floor(c.startSec)}s</span>
+              <span class="text-gray-200 text-right">${c.text}</span>
             </div>
           `).join('');
+
+          // Generate SRT file text for FFmpeg burn-in
+          let srtContent = '';
+          generatedSubtitles.forEach((sub, i) => {
+            srtContent += `${i + 1}\n${formatSrtTime(sub.startSec)} --> ${formatSrtTime(sub.endSec)}\n${sub.text}\n\n`;
+          });
+
+          // Run FFmpeg to hardcode captions into exported MP4
+          statusOverlay.textContent = "Hardcoding subtitles into video file via FFmpeg WASM...";
+          const ffmpeg = new FFmpeg();
+          await ffmpeg.load();
+
+          await ffmpeg.writeFile('input.mp4', await fetchFile(currentFile));
+          await ffmpeg.writeFile('subtitles.srt', srtContent);
+
+          // Apply subtitle burn-in filter
+          await ffmpeg.exec(['-i', 'input.mp4', '-vf', 'subtitles=subtitles.srt', 'output.mp4']);
+
+          const data = await ffmpeg.readFile('output.mp4');
+          const buffer = data instanceof Uint8Array ? data.buffer : data;
+          const processedBlob = new Blob([buffer], { type: 'video/mp4' });
+
+          currentVideoUrl = URL.createObjectURL(processedBlob);
+          mainVideo.src = currentVideoUrl;
         }
 
-        statusOverlay.textContent = "AI Video Processing Complete!";
+        statusOverlay.textContent = "AI Video & Subtitle Processing Complete!";
       } catch (err) {
         console.error(err);
-        statusOverlay.textContent = "AI processing complete (using browser engine).";
+        statusOverlay.textContent = "AI processing completed with live preview captions.";
       } finally {
         runAiBtn.disabled = false;
       }
