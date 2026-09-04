@@ -178,14 +178,13 @@
   <script type="module">
     import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
     import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
-    import { fetchFile } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
+    import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
 
     lucide.createIcons();
 
     let currentFile = null;
     let currentVideoUrl = null;
     let generatedSubtitles = [];
-    let audioBufferData = null;
 
     // AI Adaptive Learning Memory State
     let aiMemory = JSON.parse(localStorage.getItem('premiere_ai_memory')) || {
@@ -221,7 +220,6 @@
     const durationDisplay = document.getElementById('durationDisplay');
     const subtitleOverlay = document.getElementById('subtitleOverlay');
     const styleSelect = document.getElementById('styleSelect');
-    const transitionSelect = document.getElementById('transitionSelect');
     const langSelect = document.getElementById('langSelect');
     const analysisCard = document.getElementById('analysisCard');
     const analysisDetails = document.getElementById('analysisDetails');
@@ -284,14 +282,12 @@
       }
     });
 
-    // Subtitle Edit Feedback Listener (Smart Adapt)
     subtitleOverlay.addEventListener('blur', () => {
       const activeCaption = generatedSubtitles.find(sub => mainVideo.currentTime >= sub.startSec && mainVideo.currentTime <= sub.endSec);
       if (activeCaption) {
         activeCaption.text = subtitleOverlay.textContent;
         renderSubtitlesList();
 
-        // Increment memory sensitivity slightly when user performs manual edits
         aiMemory.sessionsCount += 1;
         localStorage.setItem('premiere_ai_memory', JSON.stringify(aiMemory));
         updateMemoryBadge();
@@ -314,9 +310,8 @@
       });
     }
 
-    // Audio Analysis Engine (Calculates RMS Volume Energy)
     function analyzeAudioSilence(pcmData, sampleRate = 16000) {
-      const chunkSize = sampleRate * 0.2; // 200ms analysis window
+      const chunkSize = sampleRate * 0.2;
       const silentSegments = [];
       let currentSilenceStart = null;
 
@@ -335,7 +330,7 @@
         } else {
           if (currentSilenceStart !== null) {
             const duration = timeSec - currentSilenceStart;
-            if (duration >= 0.35) { // Silence threshold
+            if (duration >= 0.35) {
               silentSegments.push({ start: currentSilenceStart, end: timeSec, duration });
             }
             currentSilenceStart = null;
@@ -374,10 +369,8 @@
           pcmData = decoded.getChannelData(0);
         }
 
-        // Phase 1: Analyze Silence
         const silences = analyzeAudioSilence(pcmData);
         
-        // Phase 2: Run Whisper Model
         statusOverlay.textContent = `AI Phase 2: Transcribing Speech (${langSelect.value.toUpperCase()})...`;
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
 
@@ -405,14 +398,18 @@
 
           renderSubtitlesList();
 
-          // Phase 3: Execute FFmpeg Dynamic Trim Cutting
-          statusOverlay.textContent = "AI Phase 3: Executing WebAssembly Video Trimming...";
+          statusOverlay.textContent = "AI Phase 3: Initializing FFmpeg WebAssembly Engine...";
           const ffmpeg = new FFmpeg();
-          await ffmpeg.load();
+          
+          const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+
+          await ffmpeg.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          });
 
           await ffmpeg.writeFile('input.mp4', await fetchFile(currentFile));
 
-          // Calculate trimmed select filter ranges
           if (silences.length > 0) {
             let selectFilter = '';
             let lastEnd = 0;
@@ -432,6 +429,7 @@
             }
 
             if (selectFilter.length > 0) {
+              statusOverlay.textContent = "Trimming silence gaps and rendering output preview...";
               await ffmpeg.exec(['-i', 'input.mp4', '-vf', `select='${selectFilter}',setpts=N/FRAME_RATE/TB`, '-af', `aselect='${selectFilter}',asetpts=N/SR/TB`, 'output.mp4']);
               
               const data = await ffmpeg.readFile('output.mp4');
@@ -441,7 +439,6 @@
             }
           }
 
-          // Render Decision Log Report
           analysisCard.classList.remove('hidden');
           analysisDetails.innerHTML = `
             <div>- Waveform Length: ${Math.floor(mainVideo.duration)}s</div>
@@ -450,7 +447,6 @@
             <div class="text-purple-400">- Learned threshold set to: ${aiMemory.sensitivityOffset}dB</div>
           `;
 
-          // Save Memory Adaptation
           aiMemory.sessionsCount += 1;
           localStorage.setItem('premiere_ai_memory', JSON.stringify(aiMemory));
           updateMemoryBadge();
@@ -461,7 +457,7 @@
         }
       } catch (err) {
         console.error("AI Error:", err);
-        statusOverlay.textContent = `AI Engine Note: Captions synced. Trimming error (${err.message || 'Check Console'})`;
+        statusOverlay.textContent = `AI Engine Error: ${err.message || 'Check Console'}`;
       } finally {
         runAiBtn.disabled = false;
       }
