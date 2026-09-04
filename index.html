@@ -11,7 +11,19 @@
     .aspect-portrait { aspect-ratio: 9 / 16; height: 100%; max-width: 100%; }
     .aspect-landscape { aspect-ratio: 16 / 9; width: 100%; max-height: 100%; }
 
-    /* TikTok Subtitle Style */
+    /* Dynamic Subtitle Style Presets */
+    .sub-style-tiktok .sub-word-active { background-color: #facc15; color: #000000; font-weight: 800; transform: scale(1.08); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .sub-style-tiktok .sub-word-inactive { background-color: rgba(0, 0, 0, 0.75); color: #ffffff; font-weight: 600; }
+
+    .sub-style-netflix .sub-word-active { background-color: #ffffff; color: #000000; font-weight: 800; }
+    .sub-style-netflix .sub-word-inactive { background-color: rgba(20, 20, 20, 0.85); color: #cccccc; font-weight: 500; }
+
+    .sub-style-neon .sub-word-active { background-color: #00f0ff; color: #000000; font-weight: 800; box-shadow: 0 0 12px #00f0ff; }
+    .sub-style-neon .sub-word-inactive { background-color: rgba(10, 10, 20, 0.9); color: #00f0ff; border: 1px solid #00f0ff; }
+
+    .sub-style-minimal .sub-word-active { background-color: #e5e5e5; color: #171717; font-weight: 700; }
+    .sub-style-minimal .sub-word-inactive { background-color: rgba(23, 23, 23, 0.9); color: #a3a3a3; }
+
     .sub-word-box {
       display: inline-block;
       padding: 2px 6px;
@@ -19,17 +31,15 @@
       border-radius: 4px;
       transition: all 0.1s ease;
     }
-    .sub-word-active {
-      background-color: #facc15;
-      color: #000000;
-      font-weight: 800;
-      transform: scale(1.08);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    }
-    .sub-word-inactive {
-      background-color: rgba(0, 0, 0, 0.75);
+
+    /* Highlight Tag */
+    .highlight-tag {
+      background-color: #8b5cf6;
       color: #ffffff;
-      font-weight: 600;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
     }
 
     /* Transition Animations for Preview Monitor */
@@ -44,6 +54,7 @@
 </head>
 <body class="bg-[#1e1e1e] text-gray-200 font-sans select-none h-screen flex flex-col overflow-hidden">
 
+  <!-- Top Application Bar -->
   <header class="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
     <div class="flex items-center space-x-4">
       <span class="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
@@ -74,7 +85,9 @@
     </div>
   </header>
 
+  <!-- Workspace -->
   <div class="flex flex-1 overflow-hidden">
+    <!-- Left Control Panel -->
     <div class="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-3 overflow-y-auto">
       
       <div id="dropZone" class="border-2 border-dashed border-[#444] rounded-lg p-3 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]">
@@ -97,6 +110,17 @@
           <select id="aspectSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
             <option value="portrait">Portrait 9:16 (TikTok/Reels)</option>
             <option value="landscape">Landscape 16:9 (YouTube)</option>
+          </select>
+        </div>
+
+        <!-- Subtitle Style Presets Dropdown Restored -->
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-gray-400">Subtitle Style:</span>
+          <select id="styleSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
+            <option value="sub-style-tiktok">TikTok Yellow</option>
+            <option value="sub-style-netflix">Netflix White</option>
+            <option value="sub-style-neon">Neon Cyberpunk</option>
+            <option value="sub-style-minimal">Minimal Dark</option>
           </select>
         </div>
 
@@ -138,6 +162,7 @@
       </div>
     </div>
 
+    <!-- Center Monitor -->
     <div class="flex-1 flex flex-col bg-[#141414]">
       <div class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
         
@@ -145,7 +170,7 @@
           <div id="monitorWrapper" class="aspect-portrait relative flex items-center justify-center overflow-hidden">
             <video id="mainVideo" class="w-full h-full rounded border border-[#333] object-contain bg-black"></video>
             
-            <div id="subtitleOverlay" class="absolute bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none px-2 py-1 z-40 w-[90%] flex flex-wrap justify-center items-center gap-1 transition-opacity duration-150 opacity-0"></div>
+            <div id="subtitleOverlay" class="sub-style-tiktok absolute bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none px-2 py-1 z-40 w-[90%] flex flex-wrap justify-center items-center gap-1 transition-opacity duration-150 opacity-0"></div>
           </div>
         </div>
 
@@ -168,6 +193,7 @@
 
   <canvas id="exportCanvas" class="hidden"></canvas>
 
+  <!-- Bottom Panel -->
   <div class="h-44 border-t border-[#333] bg-[#181818] flex flex-col">
     <div class="h-6 bg-[#222] border-b border-[#333] flex items-center justify-between px-3 text-[10px] text-gray-400">
       <div class="flex items-center space-x-2">
@@ -209,15 +235,15 @@
     let activeCutTimeline = [];
     let isAutoCutActive = false;
 
-    let aiMemory = { sessionsCount: 0, sensitivityOffset: -28 };
+    let aiMemory = { sessionsCount: 0, sensitivityOffset: -28, preferredStyle: 'sub-style-tiktok' };
     try {
-      const stored = localStorage.getItem('premiere_ai_memory_v10');
+      const stored = localStorage.getItem('premiere_ai_memory_v11');
       if (stored) aiMemory = JSON.parse(stored);
     } catch (e) {}
 
     function saveMemoryState() {
       try {
-        localStorage.setItem('premiere_ai_memory_v10', JSON.stringify(aiMemory));
+        localStorage.setItem('premiere_ai_memory_v11', JSON.stringify(aiMemory));
       } catch (e) {}
       updateMemoryBadge();
     }
@@ -252,12 +278,21 @@
     const audioTrackDuration = document.getElementById('audioTrackDuration');
     const durationDisplay = document.getElementById('durationDisplay');
     const subtitleOverlay = document.getElementById('subtitleOverlay');
+    const styleSelect = document.getElementById('styleSelect');
     const langSelect = document.getElementById('langSelect');
     const aspectSelect = document.getElementById('aspectSelect');
     const transitionSelect = document.getElementById('transitionSelect');
     const analysisCard = document.getElementById('analysisCard');
     const analysisDetails = document.getElementById('analysisDetails');
     const exportCanvas = document.getElementById('exportCanvas');
+
+    styleSelect.value = aiMemory.preferredStyle || 'sub-style-tiktok';
+
+    styleSelect.addEventListener('change', (e) => {
+      aiMemory.preferredStyle = e.target.value;
+      subtitleOverlay.className = `${e.target.value} absolute bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none px-2 py-1 z-40 w-[90%] flex flex-wrap justify-center items-center gap-1 transition-opacity duration-150 opacity-0`;
+      saveMemoryState();
+    });
 
     aspectSelect.addEventListener('change', (e) => {
       monitorWrapper.className = e.target.value === 'portrait' ? 'aspect-portrait relative flex items-center justify-center overflow-hidden' : 'aspect-landscape relative flex items-center justify-center overflow-hidden';
@@ -422,7 +457,6 @@
       });
     }
 
-    // Fixed Memory Crash Prevention Pipeline
     analyzeBtn.addEventListener('click', async () => {
       if (!currentFile) return alert("Please import a video first!");
 
@@ -459,7 +493,6 @@
 
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', pipelineOptions);
 
-        // Slice audio into 10-second chunks to completely eliminate memory lockups and browser tab crashes
         const sampleRate = 16000;
         const sliceDuration = 10; 
         const sliceSamples = sampleRate * sliceDuration;
@@ -488,7 +521,6 @@
             accumulatedChunks.push(...shiftedChunks);
           }
 
-          // Force micro-pause to release browser event loop and prevent UI lockup
           await new Promise(resolve => setTimeout(resolve, 20));
         }
 
@@ -602,7 +634,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Premiere_AI_Highlight_${Date.now()}.webm`;
+        a.download = `Premiere_AI_Export_${Date.now()}.webm`;
         a.click();
 
         statusOverlay.textContent = "Export Complete!";
@@ -664,13 +696,36 @@
           let startX = (exportCanvas.width - totalWidth) / 2;
           const startY = exportCanvas.height - 100;
 
+          const currentStyle = styleSelect.value;
+          let activeBg = '#facc15';
+          let activeFg = '#000000';
+          let inactiveBg = 'rgba(0, 0, 0, 0.75)';
+          let inactiveFg = '#ffffff';
+
+          if (currentStyle === 'sub-style-netflix') {
+            activeBg = '#ffffff';
+            activeFg = '#000000';
+            inactiveBg = 'rgba(20, 20, 20, 0.85)';
+            inactiveFg = '#cccccc';
+          } else if (currentStyle === 'sub-style-neon') {
+            activeBg = '#00f0ff';
+            activeFg = '#000000';
+            inactiveBg = 'rgba(10, 10, 20, 0.9)';
+            inactiveFg = '#00f0ff';
+          } else if (currentStyle === 'sub-style-minimal') {
+            activeBg = '#e5e5e5';
+            activeFg = '#171717';
+            inactiveBg = 'rgba(23, 23, 23, 0.9)';
+            inactiveFg = '#a3a3a3';
+          }
+
           wordMetrics.forEach((wm, idx) => {
             const isHighlight = idx === activeIdx;
             
-            ctx.fillStyle = isHighlight ? '#facc15' : 'rgba(0, 0, 0, 0.75)';
+            ctx.fillStyle = isHighlight ? activeBg : inactiveBg;
             ctx.fillRect(startX - 4, startY - 28, wm.width + 4, 36);
 
-            ctx.fillStyle = isHighlight ? '#000000' : '#ffffff';
+            ctx.fillStyle = isHighlight ? activeFg : inactiveFg;
             ctx.textAlign = 'left';
             ctx.fillText(wm.word, startX, startY);
 
