@@ -363,7 +363,7 @@ async function ensureTranscriber() {
   try {
     state.transcriber = await pipeline('automatic-speech-recognition', MODEL, {
       device,
-      dtype: device === 'webgpu' ? 'q4' : 'q8',
+      dtype: device === 'webgpu' ? { encoder_model: 'fp16', decoder_model_merged: 'q4' } : 'q8',
       progress_callback: (x) => {
         if (typeof x?.progress === 'number') progress(Math.round(x.progress));
       }
@@ -376,68 +376,38 @@ async function ensureTranscriber() {
   return state.transcriber;
 }
 
-async function extractAudioData(asset) {
-  // Do not route transcription through FFmpeg. FFmpeg's WASM worker is useful
-  // for rendering, but browser-native decoding is much more reliable for ASR.
-  // Transformers.js expects a mono Float32 waveform at 16 kHz.
-  const buffer = await asset.file.arrayBuffer();
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  if (!AudioCtx || !OfflineCtx) throw new Error('This browser does not support Web Audio decoding.');
-
-  const ctx = new AudioCtx();
-  let decoded;
-  try {
-    decoded = await ctx.decodeAudioData(buffer.slice(0));
-  } finally {
-    try { await ctx.close(); } catch {}
-  }
-
-  const targetRate = 16000;
-  const frames = Math.max(1, Math.ceil(decoded.duration * targetRate));
-  const offline = new OfflineCtx(1, frames, targetRate);
-  const source = offline.createBufferSource();
-  const mono = offline.createBuffer(1, decoded.length, decoded.sampleRate);
-  const out = mono.getChannelData(0);
-  if (decoded.numberOfChannels === 1) {
-    out.set(decoded.getChannelData(0));
-  } else {
-    for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
-      const data = decoded.getChannelData(ch);
-      for (let i = 0; i < out.length; i++) out[i] += data[i] / decoded.numberOfChannels;
-    }
-  }
-  source.buffer = mono;
-  source.connect(offline.destination);
-  source.start(0);
-  const rendered = await offline.startRendering();
-  return rendered.getChannelData(0).slice();
+async function extractWav(asset) {
+  const ff = await ensureFFmpeg();
+  const input='input.'+(asset.file.name.split('.').pop()||'mp4');
+  await ff.writeFile(input, await fetchFile(asset.file));
+  await ff.exec(['-i',input,'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','audio.wav']);
+  const data=await ff.readFile('audio.wav');
+  try { await ff.deleteFile(input); await ff.deleteFile('audio.wav'); } catch {}
+  return new Blob([data instanceof Uint8Array ? data : new Uint8Array(data)],{type:'audio/wav'});
 }
 
 async function transcribeSelected() {
   if (!state.selectedAsset) return;
   const asset=state.selectedAsset;
-  $('#transcribeBtn').disabled=true;
   try {
-    status('Decoding audio…','busy'); progress(5);
-    const audio=await extractAudioData(asset);
-    progress(25);
-    status('Loading local Whisper AI…','busy');
+    status('Extracting audio…','busy'); progress(10);
+    const wav=await extractWav(asset);
+    status('Transcribing with local Whisper…','busy'); progress(30);
     const pipe=await ensureTranscriber();
-    status('Transcribing with local Whisper…','busy'); progress(35);
-    const result=await pipe(audio,{
+    const url=URL.createObjectURL(wav);
+    const result=await pipe(url,{
       chunk_length_s:30,
       stride_length_s:5,
       return_timestamps:true,
-      language: state.lang === 'id' ? 'indonesian' : 'english',
-      task: 'transcribe'
+      language: state.lang === 'id' ? 'indonesian' : 'english'
     });
+    URL.revokeObjectURL(url);
     const chunks=result.chunks||[];
     state.transcript=chunks.map(c=>({
-      start:Number(c.timestamp?.[0] ?? 0),
-      end:Number(c.timestamp?.[1] ?? 0),
+      start:Number(c.timestamp?.[0]||0),
+      end:Number(c.timestamp?.[1]||0),
       text:String(c.text||'').trim()
-    })).filter(x=>x.text && Number.isFinite(x.start));
+    })).filter(x=>x.text);
     asset.transcript=state.transcript;
     progress(100);
     renderTranscript();
@@ -446,9 +416,7 @@ async function transcribeSelected() {
   } catch(e) {
     console.error(e);
     status('Transcription failed','error');
-    toast(`Transcription failed: ${e?.message||e}`);
-  } finally {
-    $('#transcribeBtn').disabled=!state.selectedAsset;
+    toast(`Transcription failed: ${e.message||e}`);
   }
 }
 
