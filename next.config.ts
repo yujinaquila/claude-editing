@@ -2,9 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  experimental: {
-    serverComponentsExternalPackages: ["@xenova/transformers", "@ffmpeg/ffmpeg"],
-  },
+  // Moved to root level per Next.js 16 requirements
+  serverExternalPackages: ["@xenova/transformers", "@ffmpeg/ffmpeg"],
   async headers() {
     return [
       {
