@@ -2,13 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true,
+  experimental: {
+    serverComponentsExternalPackages: ["@xenova/transformers", "@ffmpeg/ffmpeg"],
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  serverExternalPackages: ["@xenova/transformers", "@ffmpeg/ffmpeg"],
   async headers() {
     return [
       {
