@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   Play, Pause, Scissors, Sparkles, Upload, 
-  Subtitles, Video, Layers, RefreshCw 
+  Subtitles, Video, Layers, RefreshCw, Download, RotateCcw, Monitor
 } from "lucide-react";
 
-// AI Prompt Templates (EN & ID)
 const PROMPT_TEMPLATES = [
   {
     label: "[EN] TikTok / Reels Viral Hook",
@@ -43,8 +42,30 @@ export default function HomePage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [subtitles, setSubtitles] = useState<{ start: string; text: string }[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("16:9");
+  const [currentTimecode, setCurrentTimecode] = useState("00:00:00:00");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Timecode Sync
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => {
+      const time = video.currentTime;
+      const hrs = Math.floor(time / 3600).toString().padStart(2, "0");
+      const mins = Math.floor((time % 3600) / 60).toString().padStart(2, "0");
+      const secs = Math.floor(time % 60).toString().padStart(2, "0");
+      const frames = Math.floor((time % 1) * 30).toString().padStart(2, "0");
+      setCurrentTimecode(`${hrs}:${mins}:${secs}:${frames}`);
+    };
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    return () => video.removeEventListener("timeupdate", handleTimeUpdate);
+  }, []);
 
   // File Import Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +73,7 @@ export default function HomePage() {
       const file = e.target.files[0];
       setVideoFile(file);
       setVideoUrl(URL.createObjectURL(file));
+      setStatusMessage(`Loaded: ${file.name}`);
     }
   };
 
@@ -72,6 +94,17 @@ export default function HomePage() {
     if (tmpl) setPromptText(tmpl.prompt);
   };
 
+  // Export Video Handler
+  const exportVideo = () => {
+    if (!videoUrl) return alert("No media available to export / Tidak ada media untuk diekspor.");
+    const a = document.createElement("a");
+    a.href = videoUrl;
+    a.download = `Premiere_AI_Render_${Date.now()}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // Client-Side AI Pipeline Execution
   const runAIPipeline = async () => {
     if (typeof window === "undefined") return;
@@ -81,7 +114,6 @@ export default function HomePage() {
     setStatusMessage("Loading AI Models into Browser memory...");
 
     try {
-      // Dynamic import Transformers
       setStatusMessage("Transcribing Audio with Whisper AI (EN/ID)...");
       const { pipeline, env } = await import("@xenova/transformers");
       
@@ -95,7 +127,6 @@ export default function HomePage() {
         ]);
       }, 1500);
 
-      // Dynamic import FFmpeg Wasm
       setStatusMessage("Applying Silence Removal & Scene Selection...");
       const { FFmpeg } = await import("@ffmpeg/ffmpeg");
       const { fetchFile } = await import("@ffmpeg/util");
@@ -107,8 +138,6 @@ export default function HomePage() {
       await ffmpeg.exec(["-i", "input.mp4", "-t", "15", "-vf", "silencedetect=noise=-30dB:d=0.5", "output.mp4"]);
 
       const data = await ffmpeg.readFile("output.mp4");
-      
-      // Type-safe buffer extraction
       const buffer = data instanceof Uint8Array ? data.buffer : data;
       const processedBlob = new Blob([buffer as BlobPart], { type: "video/mp4" });
       setVideoUrl(URL.createObjectURL(processedBlob));
@@ -123,20 +152,113 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#1e1e1e] text-gray-200 font-sans select-none overflow-hidden">
-      {/* Top Application Bar */}
-      <header className="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333]">
+    <div 
+      className="flex flex-col h-screen bg-[#1e1e1e] text-gray-200 font-sans select-none overflow-hidden"
+      onClick={() => setActiveMenu(null)}
+    >
+      {/* Top Application Bar with Interactive Menus */}
+      <header className="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
         <div className="flex items-center space-x-4">
           <span className="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
-          <nav className="flex space-x-3 text-xs text-gray-400">
-            <span className="hover:text-white cursor-pointer">File</span>
-            <span className="hover:text-white cursor-pointer">Edit</span>
-            <span className="hover:text-white cursor-pointer">Sequence</span>
-            <span className="hover:text-white cursor-pointer">Marker</span>
-            <span className="hover:text-white cursor-pointer">Graphics</span>
+          
+          <nav className="flex space-x-1 text-xs text-gray-300 relative">
+            {/* File Menu */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button 
+                onClick={() => setActiveMenu(activeMenu === "file" ? null : "file")}
+                className={`px-2 py-1 rounded hover:bg-[#2a2a2a] ${activeMenu === "file" ? "bg-[#333] text-white" : ""}`}
+              >
+                File
+              </button>
+              {activeMenu === "file" && (
+                <div className="absolute left-0 top-full mt-1 w-44 bg-[#252525] border border-[#444] rounded shadow-xl py-1 text-xs z-50">
+                  <button onClick={() => { fileInputRef.current?.click(); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white flex items-center space-x-2">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Import Media...</span>
+                  </button>
+                  <button onClick={() => { exportVideo(); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white flex items-center space-x-2">
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Rendered Video</span>
+                  </button>
+                  <hr className="border-[#333] my-1" />
+                  <button onClick={() => { setVideoFile(null); setVideoUrl(null); setSubtitles([]); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-red-600 hover:text-white flex items-center space-x-2 text-red-400">
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Workspace</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Edit Menu */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button 
+                onClick={() => setActiveMenu(activeMenu === "edit" ? null : "edit")}
+                className={`px-2 py-1 rounded hover:bg-[#2a2a2a] ${activeMenu === "edit" ? "bg-[#333] text-white" : ""}`}
+              >
+                Edit
+              </button>
+              {activeMenu === "edit" && (
+                <div className="absolute left-0 top-full mt-1 w-44 bg-[#252525] border border-[#444] rounded shadow-xl py-1 text-xs z-50">
+                  <button onClick={() => { setPromptText(""); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white">
+                    Clear Prompt Text
+                  </button>
+                  <button onClick={() => { setSubtitles([]); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white">
+                    Clear Subtitles
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Sequence Menu */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button 
+                onClick={() => setActiveMenu(activeMenu === "sequence" ? null : "sequence")}
+                className={`px-2 py-1 rounded hover:bg-[#2a2a2a] ${activeMenu === "sequence" ? "bg-[#333] text-white" : ""}`}
+              >
+                Sequence
+              </button>
+              {activeMenu === "sequence" && (
+                <div className="absolute left-0 top-full mt-1 w-48 bg-[#252525] border border-[#444] rounded shadow-xl py-1 text-xs z-50">
+                  <button onClick={() => { runAIPipeline(); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white flex items-center space-x-2">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Auto-Cut Silences</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Graphics Menu */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button 
+                onClick={() => setActiveMenu(activeMenu === "graphics" ? null : "graphics")}
+                className={`px-2 py-1 rounded hover:bg-[#2a2a2a] ${activeMenu === "graphics" ? "bg-[#333] text-white" : ""}`}
+              >
+                Graphics
+              </button>
+              {activeMenu === "graphics" && (
+                <div className="absolute left-0 top-full mt-1 w-48 bg-[#252525] border border-[#444] rounded shadow-xl py-1 text-xs z-50">
+                  <button onClick={() => { setAspectRatio("9:16"); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white flex items-center justify-between">
+                    <span>Aspect Ratio 9:16 (TikTok/Reels)</span>
+                    {aspectRatio === "9:16" && <span className="text-purple-400">✓</span>}
+                  </button>
+                  <button onClick={() => { setAspectRatio("16:9"); setActiveMenu(null); }} className="w-full text-left px-3 py-1.5 hover:bg-purple-600 hover:text-white flex items-center justify-between">
+                    <span>Aspect Ratio 16:9 (Landscape)</span>
+                    {aspectRatio === "16:9" && <span className="text-purple-400">✓</span>}
+                  </button>
+                </div>
+              )}
+            </div>
           </nav>
         </div>
+
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={exportVideo}
+            className="flex items-center space-x-1 text-xs bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-gray-200 px-2.5 py-1.5 rounded transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export</span>
+          </button>
           <button 
             onClick={runAIPipeline}
             disabled={isProcessing}
@@ -155,12 +277,16 @@ export default function HomePage() {
         <div className="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-4">
           
           {/* File Upload Box */}
-          <div className="border-2 border-dashed border-[#444] rounded-lg p-4 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]">
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-[#444] rounded-lg p-4 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]"
+          >
             <input 
+              ref={fileInputRef}
               type="file" 
               accept="video/*" 
               onChange={handleFileUpload} 
-              className="absolute inset-0 opacity-0 cursor-pointer" 
+              className="hidden" 
             />
             <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
             <p className="text-xs text-gray-300">Import Video / Drop Media Here</p>
@@ -217,11 +343,13 @@ export default function HomePage() {
         <div className="flex-1 flex flex-col bg-[#141414]">
           <div className="flex-1 flex items-center justify-center p-4 relative">
             {videoUrl ? (
-              <video 
-                ref={videoRef} 
-                src={videoUrl} 
-                className="max-h-full max-w-full rounded border border-[#333] object-contain" 
-              />
+              <div className={`relative transition-all duration-300 ${aspectRatio === "9:16" ? "h-full aspect-[9/16]" : "max-h-full max-w-full aspect-video"}`}>
+                <video 
+                  ref={videoRef} 
+                  src={videoUrl} 
+                  className="w-full h-full rounded border border-[#333] object-contain bg-black" 
+                />
+              </div>
             ) : (
               <div className="text-center text-gray-600">
                 <Video className="w-12 h-12 mx-auto mb-2 opacity-30" />
@@ -242,11 +370,11 @@ export default function HomePage() {
               <button onClick={togglePlay} className="p-1 hover:bg-[#333] rounded text-gray-300">
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
-              <button className="p-1 hover:bg-[#333] rounded text-gray-300">
+              <button onClick={() => { if (videoRef.current) videoRef.current.currentTime = 0; }} className="p-1 hover:bg-[#333] rounded text-gray-300">
                 <Scissors className="w-4 h-4" />
               </button>
             </div>
-            <span className="text-[11px] font-mono text-gray-400">00:00:00:00</span>
+            <span className="text-[11px] font-mono text-gray-400">{currentTimecode}</span>
           </div>
         </div>
       </div>
@@ -255,7 +383,7 @@ export default function HomePage() {
       <div className="h-48 border-t border-[#333] bg-[#181818] flex flex-col">
         <div className="h-6 bg-[#222] border-b border-[#333] flex items-center px-3 text-[10px] text-gray-400 space-x-2">
           <Layers className="w-3 h-3" />
-          <span>TIMELINE TRACKS (V2 / V1 / A1)</span>
+          <span>TIMELINE TRACKS (V2 / V1 / A1) - {aspectRatio}</span>
         </div>
         
         <div className="flex-1 p-2 space-y-2 overflow-x-auto">
