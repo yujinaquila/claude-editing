@@ -11,21 +11,54 @@
     .aspect-portrait { aspect-ratio: 9 / 16; height: 100%; max-width: 100%; }
     .aspect-landscape { aspect-ratio: 16 / 9; width: 100%; max-height: 100%; }
 
-    /* Subtitle Style Presets */
-    .sub-style-tiktok { color: #facc15; background-color: rgba(0, 0, 0, 0.85); border: 1px solid rgba(250, 204, 21, 0.4); text-shadow: 2px 2px 4px rgba(0,0,0,0.9); }
-    .sub-style-netflix { color: #ffffff; background-color: rgba(0, 0, 0, 0.75); border: none; font-family: sans-serif; }
-    .sub-style-neon { color: #00f0ff; background-color: rgba(10, 10, 20, 0.9); border: 1px solid #00f0ff; box-shadow: 0 0 10px #00f0ff; }
-    .sub-style-minimal { color: #e5e5e5; background-color: rgba(23, 23, 23, 0.9); border: 1px solid #404040; }
+    /* TikTok Subtitle Style */
+    .sub-word-box {
+      display: inline-block;
+      padding: 2px 6px;
+      margin: 2px;
+      border-radius: 4px;
+      transition: all 0.1s ease;
+    }
+    .sub-word-active {
+      background-color: #facc15;
+      color: #000000;
+      font-weight: 800;
+      transform: scale(1.08);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .sub-word-inactive {
+      background-color: rgba(0, 0, 0, 0.75);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Highlight Highlighted Card */
+    .highlight-tag {
+      background-color: #8b5cf6;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* Transition Animations for Preview Monitor */
+    .transition-cut-flash {
+      animation: cutFlash 0.25s ease-out;
+    }
+    @keyframes cutFlash {
+      0% { filter: brightness(2) contrast(1.2); opacity: 0.5; }
+      100% { filter: brightness(1) contrast(1); opacity: 1; }
+    }
   </style>
 </head>
 <body class="bg-[#1e1e1e] text-gray-200 font-sans select-none h-screen flex flex-col overflow-hidden">
 
-  <!-- Top Application Bar -->
   <header class="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
     <div class="flex items-center space-x-4">
       <span class="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
       <span id="aiMemoryBadge" class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/60 px-2.5 py-0.5 rounded-full font-mono">
-        GPU Accelerator: Initializing...
+        Engine Initializing...
       </span>
     </div>
     <div class="flex items-center space-x-2">
@@ -41,14 +74,17 @@
 
       <button id="autoCutBtn" disabled class="flex items-center space-x-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 text-white px-3 py-1.5 rounded transition shadow-lg">
         <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
-        <span>2. Apply Auto-Cut</span>
+        <span>2. Apply Silence Cut</span>
+      </button>
+
+      <button id="highlightCutBtn" disabled class="flex items-center space-x-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:opacity-50 text-white px-3 py-1.5 rounded transition shadow-lg">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+        <span>3. Auto Highlight Cut</span>
       </button>
     </div>
   </header>
 
-  <!-- Workspace -->
   <div class="flex flex-1 overflow-hidden">
-    <!-- Left Panel -->
     <div class="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-3 overflow-y-auto">
       
       <div id="dropZone" class="border-2 border-dashed border-[#444] rounded-lg p-3 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]">
@@ -63,7 +99,7 @@
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
             <span>Pipeline Controls</span>
           </span>
-          <span id="silenceThresholdText" class="text-[10px] text-gray-400 font-mono">Sens: -30dB</span>
+          <span id="silenceThresholdText" class="text-[10px] text-gray-400 font-mono">Sens: -28dB</span>
         </label>
         
         <div class="flex items-center justify-between">
@@ -75,20 +111,18 @@
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Speech Language:</span>
-          <select id="langSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="english">English (Strict EN)</option>
-            <option value="indonesian">Bahasa Indonesia</option>
+          <span class="text-[11px] text-gray-400">Cut Transition:</span>
+          <select id="transitionSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
+            <option value="flash">Zoom Flash Transition</option>
+            <option value="fade">Cross Fade Transition</option>
           </select>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Subtitle Style:</span>
-          <select id="styleSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="sub-style-tiktok">TikTok Yellow</option>
-            <option value="sub-style-netflix">Netflix White</option>
-            <option value="sub-style-neon">Neon Cyberpunk</option>
-            <option value="sub-style-minimal">Minimal Dark</option>
+          <span class="text-[11px] text-gray-400">Speech Language:</span>
+          <select id="langSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
+            <option value="english">English (Strict EN)</option>
+            <option value="indonesian">Bahasa Indonesia</option>
           </select>
         </div>
       </div>
@@ -96,7 +130,7 @@
       <div id="analysisCard" class="bg-[#1e1e1e] border border-[#333] rounded p-2 hidden">
         <h4 class="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center space-x-1">
           <i data-lucide="bar-chart-2" class="w-3 h-3"></i>
-          <span>AI Waveform Decision Log</span>
+          <span>AI Highlight Analysis Report</span>
         </h4>
         <div id="analysisDetails" class="text-[10px] space-y-1 text-gray-300 font-mono"></div>
       </div>
@@ -114,14 +148,14 @@
       </div>
     </div>
 
-    <!-- Center Monitor -->
     <div class="flex-1 flex flex-col bg-[#141414]">
       <div class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
         
         <div id="monitorContainer" class="hidden w-full h-full flex items-center justify-center relative">
-          <div id="monitorWrapper" class="aspect-portrait relative flex items-center justify-center">
+          <div id="monitorWrapper" class="aspect-portrait relative flex items-center justify-center overflow-hidden">
             <video id="mainVideo" class="w-full h-full rounded border border-[#333] object-contain bg-black"></video>
-            <div id="subtitleOverlay" contenteditable="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 text-center px-4 py-1.5 rounded font-bold text-sm shadow-xl transition-all duration-150 opacity-0 z-40 max-w-[85%] sub-style-tiktok outline-none cursor-text"></div>
+            
+            <div id="subtitleOverlay" class="absolute bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none px-2 py-1 z-40 w-[90%] flex flex-wrap justify-center items-center gap-1 transition-opacity duration-150 opacity-0"></div>
           </div>
         </div>
 
@@ -142,10 +176,8 @@
     </div>
   </div>
 
-  <!-- Hidden Offscreen Export Canvas -->
   <canvas id="exportCanvas" class="hidden"></canvas>
 
-  <!-- Bottom Panel -->
   <div class="h-44 border-t border-[#333] bg-[#181818] flex flex-col">
     <div class="h-6 bg-[#222] border-b border-[#333] flex items-center justify-between px-3 text-[10px] text-gray-400">
       <div class="flex items-center space-x-2">
@@ -182,25 +214,27 @@
     let currentFile = null;
     let currentVideoUrl = null;
     let generatedSubtitles = [];
-    let detectedSilences = [];
+    let activeSpeechSegments = [];
+    let highlightSegments = [];
+    let activeCutTimeline = [];
+    let isAutoCutActive = false;
 
-    // Local Storage State Management
-    let aiMemory = { sessionsCount: 0, sensitivityOffset: -30, preferredStyle: 'sub-style-tiktok' };
+    let aiMemory = { sessionsCount: 0, sensitivityOffset: -28 };
     try {
-      const stored = localStorage.getItem('premiere_ai_memory_v6');
+      const stored = localStorage.getItem('premiere_ai_memory_v9');
       if (stored) aiMemory = JSON.parse(stored);
     } catch (e) {}
 
     function saveMemoryState() {
       try {
-        localStorage.setItem('premiere_ai_memory_v6', JSON.stringify(aiMemory));
+        localStorage.setItem('premiere_ai_memory_v9', JSON.stringify(aiMemory));
       } catch (e) {}
       updateMemoryBadge();
     }
 
     function updateMemoryBadge() {
       const hasWebGPU = !!navigator.gpu;
-      const deviceLabel = hasWebGPU ? 'WebGPU Acceleration (Fast)' : 'WASM Quantized CPU';
+      const deviceLabel = hasWebGPU ? 'WebGPU Accelerated' : 'WASM Quantized';
       document.getElementById('aiMemoryBadge').textContent = `Engine: ${deviceLabel} | ${aiMemory.sessionsCount} Runs`;
       document.getElementById('silenceThresholdText').textContent = `Sens: ${aiMemory.sensitivityOffset}dB`;
     }
@@ -217,6 +251,7 @@
     const statusOverlay = document.getElementById('statusOverlay');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const autoCutBtn = document.getElementById('autoCutBtn');
+    const highlightCutBtn = document.getElementById('highlightCutBtn');
     const exportBtn = document.getElementById('exportBtn');
     const subtitlesList = document.getElementById('subtitlesList');
     const videoTrackLabel = document.getElementById('videoTrackLabel');
@@ -227,15 +262,15 @@
     const audioTrackDuration = document.getElementById('audioTrackDuration');
     const durationDisplay = document.getElementById('durationDisplay');
     const subtitleOverlay = document.getElementById('subtitleOverlay');
-    const styleSelect = document.getElementById('styleSelect');
     const langSelect = document.getElementById('langSelect');
     const aspectSelect = document.getElementById('aspectSelect');
+    const transitionSelect = document.getElementById('transitionSelect');
     const analysisCard = document.getElementById('analysisCard');
     const analysisDetails = document.getElementById('analysisDetails');
     const exportCanvas = document.getElementById('exportCanvas');
 
     aspectSelect.addEventListener('change', (e) => {
-      monitorWrapper.className = e.target.value === 'portrait' ? 'aspect-portrait relative flex items-center justify-center' : 'aspect-landscape relative flex items-center justify-center';
+      monitorWrapper.className = e.target.value === 'portrait' ? 'aspect-portrait relative flex items-center justify-center overflow-hidden' : 'aspect-landscape relative flex items-center justify-center overflow-hidden';
     });
 
     dropZone.addEventListener('click', () => videoInput.click());
@@ -277,6 +312,7 @@
       lucide.createIcons();
     });
 
+    let lastSegmentIndex = -1;
     mainVideo.addEventListener('timeupdate', () => {
       const time = mainVideo.currentTime;
       const mins = Math.floor(time / 60).toString().padStart(2, '0');
@@ -284,27 +320,53 @@
       const frames = Math.floor((time % 1) * 30).toString().padStart(2, '0');
       timecode.textContent = `00:${mins}:${secs}:${frames}`;
 
-      if (detectedSilences.length > 0 && !mainVideo.paused) {
-        const activeSilence = detectedSilences.find(s => time >= s.start && time < s.end);
-        if (activeSilence) {
-          mainVideo.currentTime = activeSilence.end + 0.05;
+      if (isAutoCutActive && activeCutTimeline.length > 0 && !mainVideo.paused) {
+        const segIdx = activeCutTimeline.findIndex(s => time >= s.start && time <= s.end);
+
+        if (segIdx === -1) {
+          const nextSeg = activeCutTimeline.find(s => s.start > time);
+          if (nextSeg) {
+            mainVideo.currentTime = nextSeg.start;
+            triggerTransitionEffect();
+          } else {
+            mainVideo.pause();
+          }
+        } else if (segIdx !== lastSegmentIndex) {
+          if (lastSegmentIndex !== -1) triggerTransitionEffect();
+          lastSegmentIndex = segIdx;
         }
       }
 
-      const activeIndex = generatedSubtitles.findIndex(sub => time >= sub.startSec && time <= sub.endSec);
-      if (activeIndex !== -1) {
-        subtitleOverlay.textContent = generatedSubtitles[activeIndex].text;
+      const activeSub = generatedSubtitles.find(sub => time >= sub.startSec && time <= sub.endSec);
+      if (activeSub) {
+        const segmentProgress = (time - activeSub.startSec) / (activeSub.endSec - activeSub.startSec);
+        const activeWordIdx = Math.min(
+          activeSub.words.length - 1,
+          Math.floor(segmentProgress * activeSub.words.length)
+        );
+
+        subtitleOverlay.innerHTML = activeSub.words.map((w, idx) => `
+          <span class="sub-word-box ${idx === activeWordIdx ? 'sub-word-active' : 'sub-word-inactive'}">
+            ${w}
+          </span>
+        `).join('');
         subtitleOverlay.classList.remove('opacity-0');
       } else {
         subtitleOverlay.classList.add('opacity-0');
       }
     });
 
+    function triggerTransitionEffect() {
+      mainVideo.classList.add('transition-cut-flash');
+      setTimeout(() => mainVideo.classList.remove('transition-cut-flash'), 250);
+    }
+
     function renderSubtitlesList() {
       subtitlesList.innerHTML = generatedSubtitles.map((c, index) => `
         <div class="text-xs p-1.5 bg-[#2a2a2a] mb-1 rounded flex items-center justify-between">
           <span class="text-purple-300 font-mono text-[10px] mr-2">${Math.floor(c.startSec)}s</span>
           <input type="text" value="${c.text}" data-index="${index}" class="sub-input bg-transparent text-gray-200 text-right w-full focus:outline-none focus:border-b border-purple-500" />
+          ${c.isHighlight ? '<span class="highlight-tag ml-1">Hook</span>' : ''}
         </div>
       `).join('');
 
@@ -312,14 +374,16 @@
         input.addEventListener('change', (e) => {
           const idx = e.target.dataset.index;
           generatedSubtitles[idx].text = e.target.value;
+          generatedSubtitles[idx].words = e.target.value.split(' ');
         });
       });
     }
 
-    function analyzeAudioSilence(pcmData, sampleRate = 16000) {
-      const chunkSize = sampleRate * 0.2;
-      const silentSegments = [];
-      let currentSilenceStart = null;
+    function calculateSpeechSegments(pcmData, sampleRate = 16000) {
+      const chunkSize = sampleRate * 0.1;
+      const speech = [];
+      let inSpeech = false;
+      let start = 0;
 
       for (let i = 0; i < pcmData.length; i += chunkSize) {
         let sum = 0;
@@ -330,19 +394,45 @@
         const db = 20 * Math.log10(Math.max(rms, 0.00001));
         const timeSec = i / sampleRate;
 
-        if (db < aiMemory.sensitivityOffset) {
-          if (currentSilenceStart === null) currentSilenceStart = timeSec;
+        if (db >= aiMemory.sensitivityOffset) {
+          if (!inSpeech) {
+            inSpeech = true;
+            start = Math.max(0, timeSec - 0.1);
+          }
         } else {
-          if (currentSilenceStart !== null) {
-            const duration = timeSec - currentSilenceStart;
-            if (duration >= 0.35) {
-              silentSegments.push({ start: currentSilenceStart, end: timeSec, duration });
-            }
-            currentSilenceStart = null;
+          if (inSpeech) {
+            inSpeech = false;
+            speech.push({ start, end: timeSec + 0.1 });
           }
         }
       }
-      return silentSegments;
+      if (inSpeech) speech.push({ start, end: pcmData.length / sampleRate });
+      return speech;
+    }
+
+    // AI Highlight Detector based on keyword scoring and speech density
+    function autoDetectViralHighlights(subtitles) {
+      const highlightKeywords = ['viral', 'hook', 'secret', 'best', 'key', 'amazing', 'never', 'now', 'stop', 'watch', 'tips', 'rahasia', 'penting', 'trik', 'cara', 'kamu', 'lihat', 'wow', 'gokil', 'wajib'];
+      
+      return subtitles.map(sub => {
+        const textLower = sub.text.toLowerCase();
+        let score = 0;
+
+        highlightKeywords.forEach(word => {
+          if (textLower.includes(word)) score += 2;
+        });
+
+        // First 5 seconds of the video are auto-flagged as hooks
+        if (sub.startSec <= 5.0) score += 3;
+
+        // Fast high-density speech segments get a higher score
+        const wordCount = sub.words.length;
+        const duration = sub.endSec - sub.startSec;
+        if (duration > 0 && (wordCount / duration) > 2.5) score += 2;
+
+        const isHighlight = score >= 2;
+        return { ...sub, isHighlight, score };
+      });
     }
 
     analyzeBtn.addEventListener('click', async () => {
@@ -350,7 +440,7 @@
 
       analyzeBtn.disabled = true;
       statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Fast PCM Downsampling...";
+      statusOverlay.textContent = "Processing PCM Audio Waveform...";
 
       try {
         env.allowLocalModels = false;
@@ -371,7 +461,7 @@
           pcmData = decoded.getChannelData(0);
         }
 
-        detectedSilences = analyzeAudioSilence(pcmData);
+        activeSpeechSegments = calculateSpeechSegments(pcmData);
         
         const hasWebGPU = !!navigator.gpu;
         statusOverlay.textContent = `Running ${hasWebGPU ? 'WebGPU Accelerated' : 'Quantized WASM'} Whisper...`;
@@ -390,33 +480,41 @@
         });
 
         if (result && result.chunks) {
-          generatedSubtitles = result.chunks.map((c, idx, arr) => {
+          const rawSubs = result.chunks.map((c, idx, arr) => {
             const start = c.timestamp[0];
             let end = c.timestamp[1] || (start + 2);
             if (arr[idx + 1] && end > arr[idx + 1].timestamp[0]) {
               end = arr[idx + 1].timestamp[0] - 0.05;
             }
+            const cleanText = c.text.trim();
             return {
               startSec: Math.max(0, start),
               endSec: Math.max(start + 0.5, end),
-              text: c.text.trim()
+              text: cleanText,
+              words: cleanText.split(' ')
             };
           }).filter(c => c.text.length > 0);
 
-          renderSubtitlesList();
+          // Auto-detect viral highlights
+          generatedSubtitles = autoDetectViralHighlights(rawSubs);
+          
+          highlightSegments = generatedSubtitles
+            .filter(sub => sub.isHighlight)
+            .map(sub => ({ start: sub.startSec, end: sub.endSec }));
 
-          const totalTrimSecs = detectedSilences.reduce((acc, curr) => acc + curr.duration, 0).toFixed(1);
+          renderSubtitlesList();
 
           analysisCard.classList.remove('hidden');
           analysisDetails.innerHTML = `
-            <div>- Original Duration: ${Math.floor(mainVideo.duration)}s</div>
-            <div>- Detected ${detectedSilences.length} silence regions</div>
-            <div>- Total Trim: ${totalTrimSecs}s</div>
-            <div class="text-emerald-400 font-bold">- Ready to Cut! Click "2. Apply Auto-Cut"</div>
+            <div>- Video Length: ${Math.floor(mainVideo.duration)}s</div>
+            <div>- Speech Segments: ${activeSpeechSegments.length} active</div>
+            <div>- Viral Highlights: ${highlightSegments.length} key moments</div>
+            <div class="text-purple-400 font-bold">- Choose "2. Silence Cut" or "3. Highlight Cut"</div>
           `;
 
           autoCutBtn.disabled = false;
-          statusOverlay.textContent = "Transcription Finished! Click 'Apply Auto-Cut' to trim silence.";
+          highlightCutBtn.disabled = false;
+          statusOverlay.textContent = "Analysis Complete! Select an Auto-Cut mode above.";
         }
       } catch (err) {
         console.error("Transcribe Error:", err);
@@ -426,29 +524,48 @@
       }
     });
 
+    // Option 1: Standard Silence Cut (Trims dead air)
     autoCutBtn.addEventListener('click', () => {
-      if (detectedSilences.length === 0) return alert("No silences detected to cut.");
+      if (activeSpeechSegments.length === 0) return alert("No speech detected.");
 
-      const totalTrimSecs = detectedSilences.reduce((acc, curr) => acc + curr.duration, 0).toFixed(1);
-      
+      activeCutTimeline = activeSpeechSegments;
+      isAutoCutActive = true;
       aiMemory.sessionsCount += 1;
       saveMemoryState();
 
-      statusOverlay.textContent = `Auto-Cut Active! ${detectedSilences.length} silence gaps removed.`;
-      
-      mainVideo.currentTime = 0;
+      statusOverlay.textContent = "Silence Cut Active! Trimming dead-air gaps.";
+      mainVideo.currentTime = activeCutTimeline[0].start;
       mainVideo.play();
       playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
       lucide.createIcons();
     });
 
-    // Native MediaRecorder Canvas Exporter
+    // Option 2: Highlight-Only Cut (Trims everything except viral/high-energy moments)
+    highlightCutBtn.addEventListener('click', () => {
+      if (highlightSegments.length === 0) {
+        activeCutTimeline = activeSpeechSegments.slice(0, Math.min(3, activeSpeechSegments.length));
+      } else {
+        activeCutTimeline = highlightSegments;
+      }
+
+      isAutoCutActive = true;
+      aiMemory.sessionsCount += 1;
+      saveMemoryState();
+
+      statusOverlay.textContent = `Highlight Cut Active! Playing ${activeCutTimeline.length} viral scenes only.`;
+      mainVideo.currentTime = activeCutTimeline[0].start;
+      mainVideo.play();
+      playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
+      lucide.createIcons();
+    });
+
+    // Native Exporter supporting both Silence & Highlight cut modes
     exportBtn.addEventListener('click', async () => {
       if (!currentVideoUrl) return alert("Please import media first!");
 
       exportBtn.disabled = true;
       statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Rendering edited stream to output file...";
+      statusOverlay.textContent = "Rendering highlighted media to output file...";
 
       const isPortrait = aspectSelect.value === 'portrait';
       exportCanvas.width = isPortrait ? 720 : 1280;
@@ -476,16 +593,19 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Premiere_AI_Export_${Date.now()}.webm`;
+        a.download = `Premiere_AI_Highlight_${Date.now()}.webm`;
         a.click();
 
         statusOverlay.textContent = "Export Complete!";
         exportBtn.disabled = false;
       };
 
-      mainVideo.currentTime = 0;
+      isAutoCutActive = true;
+      mainVideo.currentTime = activeCutTimeline.length > 0 ? activeCutTimeline[0].start : 0;
       await mainVideo.play();
       recorder.start();
+
+      let transitionAlpha = 0;
 
       const renderFrame = () => {
         if (mainVideo.ended || mainVideo.paused) {
@@ -496,7 +616,6 @@
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
-        // Aspect cropping
         const vRatio = mainVideo.videoWidth / mainVideo.videoHeight;
         const cRatio = exportCanvas.width / exportCanvas.height;
         let dw = exportCanvas.width;
@@ -514,16 +633,40 @@
 
         ctx.drawImage(mainVideo, dx, dy, dw, dh);
 
-        // Render captions onto exported video frame
+        if (transitionAlpha > 0) {
+          ctx.fillStyle = transitionSelect.value === 'flash' ? `rgba(255, 255, 255, ${transitionAlpha})` : `rgba(0, 0, 0, ${transitionAlpha})`;
+          ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+          transitionAlpha -= 0.1;
+        }
+
         const activeSub = generatedSubtitles.find(s => mainVideo.currentTime >= s.startSec && mainVideo.currentTime <= s.endSec);
-        if (activeSub) {
+        if (activeSub && activeSub.words) {
+          const segProgress = (mainVideo.currentTime - activeSub.startSec) / (activeSub.endSec - activeSub.startSec);
+          const activeIdx = Math.min(activeSub.words.length - 1, Math.floor(segProgress * activeSub.words.length));
+
           ctx.font = 'bold 28px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#facc15';
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 4;
-          ctx.strokeText(activeSub.text, exportCanvas.width / 2, exportCanvas.height - 80);
-          ctx.fillText(activeSub.text, exportCanvas.width / 2, exportCanvas.height - 80);
+          let totalWidth = 0;
+          const wordMetrics = activeSub.words.map(w => {
+            const m = ctx.measureText(w + ' ');
+            totalWidth += m.width;
+            return { word: w, width: m.width };
+          });
+
+          let startX = (exportCanvas.width - totalWidth) / 2;
+          const startY = exportCanvas.height - 100;
+
+          wordMetrics.forEach((wm, idx) => {
+            const isHighlight = idx === activeIdx;
+            
+            ctx.fillStyle = isHighlight ? '#facc15' : 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(startX - 4, startY - 28, wm.width + 4, 36);
+
+            ctx.fillStyle = isHighlight ? '#000000' : '#ffffff';
+            ctx.textAlign = 'left';
+            ctx.fillText(wm.word, startX, startY);
+
+            startX += wm.width;
+          });
         }
 
         requestAnimationFrame(renderFrame);
