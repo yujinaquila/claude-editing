@@ -93,7 +93,7 @@
         </div>
 
         <!-- Status Overlay -->
-        <div id="statusOverlay" class="hidden absolute bottom-6 bg-purple-900/90 text-purple-100 text-xs px-3 py-1 rounded backdrop-blur border border-purple-500"></div>
+        <div id="statusOverlay" class="hidden absolute bottom-6 bg-purple-900/90 text-purple-100 text-xs px-3 py-1 rounded backdrop-blur border border-purple-500 z-50 max-w-md text-center"></div>
       </div>
 
       <!-- Transport Controls -->
@@ -131,8 +131,6 @@
   <!-- Client JavaScript Logic -->
   <script type="module">
     import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-    import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
-    import { fetchFile } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
 
     lucide.createIcons();
 
@@ -164,17 +162,10 @@
     const presetSelect = document.getElementById('presetSelect');
     const promptText = document.getElementById('promptText');
 
-    // Preset Selection Event Listener
     presetSelect.addEventListener('change', (e) => {
-      const selectedKey = e.target.value;
-      if (PROMPT_PRESETS[selectedKey]) {
-        promptText.value = PROMPT_PRESETS[selectedKey];
-      } else {
-        promptText.value = "";
-      }
+      promptText.value = PROMPT_PRESETS[e.target.value] || "";
     });
 
-    // File Selection
     dropZone.addEventListener('click', () => videoInput.click());
     videoInput.addEventListener('change', (e) => {
       if (e.target.files && e.target.files[0]) {
@@ -192,7 +183,6 @@
       }
     });
 
-    // Play/Pause Controller
     playBtn.addEventListener('click', () => {
       if (mainVideo.paused) {
         mainVideo.play();
@@ -204,7 +194,6 @@
       lucide.createIcons();
     });
 
-    // Timecode & Live Subtitle Overlay Sync
     mainVideo.addEventListener('timeupdate', () => {
       const time = mainVideo.currentTime;
       const mins = Math.floor(time / 60).toString().padStart(2, '0');
@@ -222,7 +211,6 @@
       }
     });
 
-    // Export Functionality
     exportBtn.addEventListener('click', () => {
       if (!currentVideoUrl) return alert("Please import media first!");
       const a = document.createElement('a');
@@ -231,40 +219,37 @@
       a.click();
     });
 
-    function formatSrtTime(seconds) {
-      const hrs = Math.floor(seconds / 3600).toString().padStart(2, '0');
-      const mins = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
-      const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
-      const ms = Math.floor((seconds % 1) * 1000).toString().padStart(3, '0');
-      return `${hrs}:${mins}:${secs},${ms}`;
-    }
-
-    // Run AI Execution Pipeline
     runAiBtn.addEventListener('click', async () => {
       if (!currentFile) return alert("Please import a video first!");
 
       runAiBtn.disabled = true;
       statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Loading Whisper AI Model...";
+      statusOverlay.textContent = "Loading Whisper AI Engine (Single-Thread WASM)...";
 
       try {
+        // Disable multi-threaded worker calls to bypass CORS/COOP restrictions
         env.allowLocalModels = false;
         env.useBrowserCache = true;
+        env.allowRemoteModels = true;
+        if (env.backends && env.backends.onnx) {
+          env.backends.onnx.wasm.numThreads = 1;
+        }
 
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
-        statusOverlay.textContent = "Extracting Speech & Generating Captions...";
+        statusOverlay.textContent = "Decoding audio stream (16kHz PCM)...";
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         const arrayBuf = await currentFile.arrayBuffer();
         const decoded = await audioCtx.decodeAudioData(arrayBuf);
         const pcmData = decoded.getChannelData(0);
 
+        statusOverlay.textContent = "Transcribing speech to captions...";
         const result = await transcriber(pcmData, { return_timestamps: true });
 
-        if (result && result.chunks) {
+        if (result && result.chunks && result.chunks.length > 0) {
           generatedSubtitles = result.chunks.map(c => ({
             startSec: c.timestamp[0],
-            endSec: c.timestamp[1] || c.timestamp[0] + 2,
+            endSec: c.timestamp[1] || (c.timestamp[0] + 2),
             text: c.text.trim()
           }));
 
@@ -275,32 +260,13 @@
             </div>
           `).join('');
 
-          let srtContent = '';
-          generatedSubtitles.forEach((sub, i) => {
-            srtContent += `${i + 1}\n${formatSrtTime(sub.startSec)} --> ${formatSrtTime(sub.endSec)}\n${sub.text}\n\n`;
-          });
-
-          statusOverlay.textContent = "Hardcoding subtitles into video file via FFmpeg WASM...";
-          const ffmpeg = new FFmpeg();
-          await ffmpeg.load();
-
-          await ffmpeg.writeFile('input.mp4', await fetchFile(currentFile));
-          await ffmpeg.writeFile('subtitles.srt', srtContent);
-
-          await ffmpeg.exec(['-i', 'input.mp4', '-vf', 'subtitles=subtitles.srt', 'output.mp4']);
-
-          const data = await ffmpeg.readFile('output.mp4');
-          const buffer = data instanceof Uint8Array ? data.buffer : data;
-          const processedBlob = new Blob([buffer], { type: 'video/mp4' });
-
-          currentVideoUrl = URL.createObjectURL(processedBlob);
-          mainVideo.src = currentVideoUrl;
+          statusOverlay.textContent = "AI Subtitles Generated Successfully!";
+        } else {
+          statusOverlay.textContent = "No distinct speech detected in video.";
         }
-
-        statusOverlay.textContent = "AI Video & Subtitle Processing Complete!";
       } catch (err) {
-        console.error(err);
-        statusOverlay.textContent = "AI processing completed with live preview captions.";
+        console.error("AI Error:", err);
+        statusOverlay.textContent = `AI Transcriber Error: ${err.message || 'Check Console'}`;
       } finally {
         runAiBtn.disabled = false;
       }
