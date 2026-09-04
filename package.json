@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && cp -r .next dist",
     "start": "next start",
     "lint": "next lint"
   },
@@ -30,10 +30,4 @@
   "allowScripts": {
     "sharp@0.32.6": true
   }
-}
-"scripts": {
-  "dev": "next dev",
-  "build": "next build && cp -r .next dist",
-  "start": "next start",
-  "lint": "next lint"
 }
