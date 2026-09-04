@@ -1,6 +1,8 @@
+"use client";
+
 import React, { useState, useRef } from "react";
 import { 
-  Play, Pause, Scissor, Sparkles, Upload, 
+  Play, Pause, Scissors, Sparkles, Upload, 
   Subtitles, Video, Layers, RefreshCw 
 } from "lucide-react";
 
@@ -70,9 +72,8 @@ export default function HomePage() {
     if (tmpl) setPromptText(tmpl.prompt);
   };
 
-  // Safe Client-Side AI Pipeline Execution
+  // Client-Side AI Pipeline Execution
   const runAIPipeline = async () => {
-    // 1. Guard check to ensure execution happens purely inside client browser (Bypasses Vercel Build Error)
     if (typeof window === "undefined") return;
     if (!videoFile) return alert("Please import a video first / Silakan impor video terlebih dahulu.");
 
@@ -80,14 +81,13 @@ export default function HomePage() {
     setStatusMessage("Loading AI Models into Browser memory...");
 
     try {
-      // 2. Dynamic Import HuggingFace Transformers
+      // Dynamic import Transformers
       setStatusMessage("Transcribing Audio with Whisper AI (EN/ID)...");
       const { pipeline, env } = await import("@xenova/transformers");
       
       env.allowLocalModels = false;
       env.useBrowserCache = true;
 
-      // Note: Full transcription runs locally on browser Wasm thread
       setTimeout(() => {
         setSubtitles([
           { start: "00:00:00", text: "Stop scrolling right now!" },
@@ -95,7 +95,7 @@ export default function HomePage() {
         ]);
       }, 1500);
 
-      // 3. Dynamic Import FFmpeg Wasm
+      // Dynamic import FFmpeg Wasm
       setStatusMessage("Applying Silence Removal & Scene Selection...");
       const { FFmpeg } = await import("@ffmpeg/ffmpeg");
       const { fetchFile } = await import("@ffmpeg/util");
@@ -104,7 +104,6 @@ export default function HomePage() {
       await ffmpeg.load();
       await ffmpeg.writeFile("input.mp4", await fetchFile(videoFile));
 
-      // Trim video and detect silence via FFmpeg filters
       await ffmpeg.exec(["-i", "input.mp4", "-t", "15", "-vf", "silencedetect=noise=-30dB:d=0.5", "output.mp4"]);
 
       const data = await ffmpeg.readFile("output.mp4");
@@ -149,7 +148,7 @@ export default function HomePage() {
       {/* Main Workspace Layout */}
       <div className="flex flex-1 overflow-hidden">
         
-        {/* Left Panel: Media Pool & AI Automation Control */}
+        {/* Left Panel: Media Pool & AI Control */}
         <div className="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-4">
           
           {/* File Upload Box */}
@@ -241,7 +240,7 @@ export default function HomePage() {
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
               <button className="p-1 hover:bg-[#333] rounded text-gray-300">
-                <Scissor className="w-4 h-4" />
+                <Scissors className="w-4 h-4" />
               </button>
             </div>
             <span className="text-[11px] font-mono text-gray-400">00:00:00:00</span>
