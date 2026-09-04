@@ -17,7 +17,7 @@
     .sub-style-neon { color: #00f0ff; background-color: rgba(10, 10, 20, 0.9); border: 1px solid #00f0ff; box-shadow: 0 0 10px #00f0ff; }
     .sub-style-minimal { color: #e5e5e5; background-color: rgba(23, 23, 23, 0.9); border: 1px solid #404040; }
 
-    /* Scene Transitions */
+    /* Transitions */
     .trans-active-fade { opacity: 0; transition: opacity 0.2s ease-in-out; }
     .trans-active-dissolve { filter: brightness(1.8) contrast(1.2); transition: filter 0.2s ease-in-out; }
     .trans-active-zoom { transform: scale(1.04); transition: transform 0.2s ease-out; }
@@ -25,12 +25,11 @@
 </head>
 <body class="bg-[#1e1e1e] text-gray-200 font-sans select-none h-screen flex flex-col overflow-hidden">
 
-  <!-- Top Bar -->
   <header class="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
     <div class="flex items-center space-x-4">
       <span class="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
       <span id="aiMemoryBadge" class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/60 px-2.5 py-0.5 rounded-full font-mono">
-        AI Level: Loading...
+        GPU Accelerator: Initializing...
       </span>
     </div>
     <div class="flex items-center space-x-2">
@@ -39,10 +38,9 @@
         <span>Export Render</span>
       </button>
       
-      <!-- Separate Actions for AI Pipeline -->
       <button id="analyzeBtn" class="flex items-center space-x-1.5 text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1.5 rounded transition shadow-lg">
-        <i data-lucide="brain" class="w-3.5 h-3.5"></i>
-        <span>1. Analyze Speech & Gaps</span>
+        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+        <span>1. Fast GPU Transcribe</span>
       </button>
 
       <button id="autoCutBtn" disabled class="flex items-center space-x-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 text-white px-3 py-1.5 rounded transition shadow-lg">
@@ -52,19 +50,15 @@
     </div>
   </header>
 
-  <!-- Workspace -->
   <div class="flex flex-1 overflow-hidden">
-    <!-- Left Control Panel -->
     <div class="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-3 overflow-y-auto">
       
-      <!-- Import Zone -->
       <div id="dropZone" class="border-2 border-dashed border-[#444] rounded-lg p-3 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]">
         <input type="file" id="videoInput" accept="video/*" class="hidden" />
         <i data-lucide="upload" class="w-5 h-5 mx-auto mb-1 text-gray-400"></i>
         <p class="text-xs text-gray-300">Import Video / Drop Media Here</p>
       </div>
 
-      <!-- Controls -->
       <div class="flex flex-col space-y-2 bg-[#1e1e1e] p-2.5 rounded border border-[#333]">
         <label class="text-xs font-semibold text-purple-400 flex items-center justify-between">
           <span class="flex items-center space-x-1">
@@ -101,16 +95,14 @@
         </div>
       </div>
 
-      <!-- AI Decision Report -->
       <div id="analysisCard" class="bg-[#1e1e1e] border border-[#333] rounded p-2 hidden">
         <h4 class="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center space-x-1">
           <i data-lucide="bar-chart-2" class="w-3 h-3"></i>
-          <span>AI Analysis & Dead-Air Report</span>
+          <span>AI Waveform Decision Log</span>
         </h4>
         <div id="analysisDetails" class="text-[10px] space-y-1 text-gray-300 font-mono"></div>
       </div>
 
-      <!-- Subtitles -->
       <div class="flex-1 bg-[#1e1e1e] border border-[#333] rounded p-2 overflow-y-auto">
         <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
           <span class="flex items-center space-x-1">
@@ -119,12 +111,11 @@
           </span>
         </h4>
         <div id="subtitlesList" class="space-y-1">
-          <p class="text-[10px] text-gray-500 italic">Run Analysis to generate captions.</p>
+          <p class="text-[10px] text-gray-500 italic">Run Transcribe to parse captions.</p>
         </div>
       </div>
     </div>
 
-    <!-- Monitor -->
     <div class="flex-1 flex flex-col bg-[#141414]">
       <div class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
         
@@ -143,7 +134,6 @@
         <div id="statusOverlay" class="hidden absolute bottom-6 bg-purple-900/90 text-purple-100 text-xs px-3 py-1.5 rounded backdrop-blur border border-purple-500 z-50 max-w-md text-center shadow-2xl"></div>
       </div>
 
-      <!-- Controls -->
       <div class="h-10 bg-[#1e1e1e] border-t border-[#333] flex items-center justify-between px-4">
         <button id="playBtn" class="p-1 hover:bg-[#333] rounded text-gray-300">
           <i data-lucide="play" class="w-4 h-4"></i>
@@ -153,7 +143,6 @@
     </div>
   </div>
 
-  <!-- Timeline -->
   <div class="h-44 border-t border-[#333] bg-[#181818] flex flex-col">
     <div class="h-6 bg-[#222] border-b border-[#333] flex items-center justify-between px-3 text-[10px] text-gray-400">
       <div class="flex items-center space-x-2">
@@ -192,24 +181,24 @@
     let generatedSubtitles = [];
     let detectedSilences = [];
 
-    // Persisted AI Memory
+    // Local Storage State Management
     let aiMemory = { sessionsCount: 0, sensitivityOffset: -30, preferredStyle: 'sub-style-tiktok' };
     try {
-      const stored = localStorage.getItem('premiere_ai_memory_v4');
+      const stored = localStorage.getItem('premiere_ai_memory_v5');
       if (stored) aiMemory = JSON.parse(stored);
-    } catch (e) {
-      console.warn("Memory read failed:", e);
-    }
+    } catch (e) {}
 
     function saveMemoryState() {
       try {
-        localStorage.setItem('premiere_ai_memory_v4', JSON.stringify(aiMemory));
+        localStorage.setItem('premiere_ai_memory_v5', JSON.stringify(aiMemory));
       } catch (e) {}
       updateMemoryBadge();
     }
 
     function updateMemoryBadge() {
-      document.getElementById('aiMemoryBadge').textContent = `AI Level: ${Math.floor(aiMemory.sessionsCount / 2) + 1} (${aiMemory.sessionsCount} Sessions Saved)`;
+      const hasWebGPU = !!navigator.gpu;
+      const deviceLabel = hasWebGPU ? 'WebGPU Acceleration (Fast)' : 'WASM Quantized CPU';
+      document.getElementById('aiMemoryBadge').textContent = `Engine: ${deviceLabel} | ${aiMemory.sessionsCount} Runs`;
       document.getElementById('silenceThresholdText').textContent = `Sens: ${aiMemory.sensitivityOffset}dB`;
     }
     updateMemoryBadge();
@@ -284,7 +273,6 @@
       lucide.createIcons();
     });
 
-    // Subtitle & Silence Skip Engine during playback
     mainVideo.addEventListener('timeupdate', () => {
       const time = mainVideo.currentTime;
       const mins = Math.floor(time / 60).toString().padStart(2, '0');
@@ -292,7 +280,6 @@
       const frames = Math.floor((time % 1) * 30).toString().padStart(2, '0');
       timecode.textContent = `00:${mins}:${secs}:${frames}`;
 
-      // Auto-skip silent timecodes if auto-cut mode is enabled
       if (detectedSilences.length > 0 && !mainVideo.paused) {
         const activeSilence = detectedSilences.find(s => time >= s.start && time < s.end);
         if (activeSilence) {
@@ -354,13 +341,13 @@
       return silentSegments;
     }
 
-    // Step 1: Analyze Speech & Silence Gaps
+    // High-Performance Transcribe Logic
     analyzeBtn.addEventListener('click', async () => {
       if (!currentFile) return alert("Please import a video first!");
 
       analyzeBtn.disabled = true;
       statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Analyzing audio energy and waveform...";
+      statusOverlay.textContent = "Fast PCM Downsampling...";
 
       try {
         env.allowLocalModels = false;
@@ -383,15 +370,26 @@
 
         detectedSilences = analyzeAudioSilence(pcmData);
         
-        statusOverlay.textContent = `Transcribing Subtitles (${langSelect.value.toUpperCase()})...`;
-        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+        const hasWebGPU = !!navigator.gpu;
+        statusOverlay.textContent = `Running ${hasWebGPU ? 'WebGPU Accelerated' : 'Quantized WASM'} Whisper...`;
+        
+        // Optimize pipeline by preferring WebGPU hardware device or 8-bit quantization
+        const pipelineOptions = {
+          quantized: true,
+          dtype: 'q8'
+        };
+        if (hasWebGPU) {
+          pipelineOptions.device = 'webgpu';
+        }
+
+        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', pipelineOptions);
 
         const result = await transcriber(pcmData, {
           language: langSelect.value,
           task: 'transcribe',
           return_timestamps: true,
-          chunk_length_s: 30,
-          stride_length_s: 5
+          chunk_length_s: 15, // Reduced chunk size prevents main-thread lockup
+          stride_length_s: 3
         });
 
         if (result && result.chunks) {
@@ -415,23 +413,22 @@
           analysisCard.classList.remove('hidden');
           analysisDetails.innerHTML = `
             <div>- Original Duration: ${Math.floor(mainVideo.duration)}s</div>
-            <div>- Detected ${detectedSilences.length} dead-air pause regions</div>
-            <div>- Total Silence to Cut: ${totalTrimSecs}s</div>
-            <div class="text-emerald-400 font-bold">- Ready to Auto-Cut! Press "2. Apply Auto-Cut"</div>
+            <div>- Detected ${detectedSilences.length} silence regions</div>
+            <div>- Total Trim: ${totalTrimSecs}s</div>
+            <div class="text-emerald-400 font-bold">- Ready to Cut! Click "2. Apply Auto-Cut"</div>
           `;
 
           autoCutBtn.disabled = false;
-          statusOverlay.textContent = "Analysis Complete! Click 'Apply Auto-Cut' to trim pauses.";
+          statusOverlay.textContent = "Transcription Finished! Click 'Apply Auto-Cut' to trim silence.";
         }
       } catch (err) {
-        console.error("Analysis Error:", err);
-        statusOverlay.textContent = `Analysis Error: ${err.message || 'Check Console'}`;
+        console.error("Transcribe Error:", err);
+        statusOverlay.textContent = `Execution Error: ${err.message || 'Check Console'}`;
       } finally {
         analyzeBtn.disabled = false;
       }
     });
 
-    // Step 2: Apply Silence Trimming
     autoCutBtn.addEventListener('click', () => {
       if (detectedSilences.length === 0) return alert("No silences detected to cut.");
 
@@ -440,9 +437,8 @@
       aiMemory.sessionsCount += 1;
       saveMemoryState();
 
-      statusOverlay.textContent = `Auto-Cut Active! Cut ${detectedSilences.length} pauses (${totalTrimSecs}s removed).`;
+      statusOverlay.textContent = `Auto-Cut Active! ${detectedSilences.length} silence gaps removed.`;
       
-      // Auto-start playback with silence skipping enabled
       mainVideo.currentTime = 0;
       mainVideo.play();
       playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
