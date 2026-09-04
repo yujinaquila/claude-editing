@@ -56,10 +56,10 @@
         
         <select id="presetSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1.5 focus:outline-none focus:border-purple-500">
           <option value="">-- Choose Preset Template --</option>
-          <option value="[EN] TikTok / Reels Viral Hook">[EN] TikTok / Reels Viral Hook</option>
-          <option value="[ID] TikTok / Reels Hook Viral">[ID] TikTok / Reels Hook Viral</option>
-          <option value="[EN] Full Marketing Auto-Cut">[EN] Full Marketing Auto-Cut</option>
-          <option value="[ID] Potong Otomatis Pemasaran">[ID] Potong Otomatis Pemasaran</option>
+          <option value="hook_en">[EN] TikTok / Reels Viral Hook</option>
+          <option value="hook_id">[ID] TikTok / Reels Hook Viral</option>
+          <option value="autocut_en">[EN] Full Marketing Auto-Cut</option>
+          <option value="autocut_id">[ID] Potong Otomatis Pemasaran</option>
         </select>
 
         <textarea id="promptText" rows="3" placeholder="e.g., Cut silences, extract hook, generate subtitle in Bahasa Indonesia..." class="bg-[#2a2a2a] border border-[#444] text-xs p-2 rounded text-gray-200 focus:outline-none focus:border-purple-500 resize-none"></textarea>
@@ -140,6 +140,13 @@
     let currentVideoUrl = null;
     let generatedSubtitles = [];
 
+    const PROMPT_PRESETS = {
+      hook_en: "Auto-detect the most engaging 3-second opening scene. Cut all silence over 0.4s. Burn dynamic yellow subtitles in the center.",
+      hook_id: "Deteksi adegan 3 detik pertama yang paling menarik. Hapus keheningan di atas 0.4 detik. Buat teks otomatis warna kuning di tengah.",
+      autocut_en: "Remove all pause gaps, generate English captions, and format aspect ratio to 9:16 vertical video.",
+      autocut_id: "Hapus bagian diam, buat subtitle Bahasa Indonesia, dan ubah rasio video menjadi 9:16 vertikal."
+    };
+
     const dropZone = document.getElementById('dropZone');
     const videoInput = document.getElementById('videoInput');
     const mainVideo = document.getElementById('mainVideo');
@@ -154,6 +161,18 @@
     const videoTrackLabel = document.getElementById('videoTrackLabel');
     const audioTrackLabel = document.getElementById('audioTrackLabel');
     const subtitleOverlay = document.getElementById('subtitleOverlay');
+    const presetSelect = document.getElementById('presetSelect');
+    const promptText = document.getElementById('promptText');
+
+    // Preset Selection Event Listener
+    presetSelect.addEventListener('change', (e) => {
+      const selectedKey = e.target.value;
+      if (PROMPT_PRESETS[selectedKey]) {
+        promptText.value = PROMPT_PRESETS[selectedKey];
+      } else {
+        promptText.value = "";
+      }
+    });
 
     // File Selection
     dropZone.addEventListener('click', () => videoInput.click());
@@ -193,7 +212,6 @@
       const frames = Math.floor((time % 1) * 30).toString().padStart(2, '0');
       timecode.textContent = `00:${mins}:${secs}:${frames}`;
 
-      // Search matching active caption segment
       const activeCaption = generatedSubtitles.find(sub => time >= sub.startSec && time <= sub.endSec);
 
       if (activeCaption) {
@@ -213,7 +231,6 @@
       a.click();
     });
 
-    // Helper: Convert timestamp to SRT format
     function formatSrtTime(seconds) {
       const hrs = Math.floor(seconds / 3600).toString().padStart(2, '0');
       const mins = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
@@ -258,13 +275,11 @@
             </div>
           `).join('');
 
-          // Generate SRT file text for FFmpeg burn-in
           let srtContent = '';
           generatedSubtitles.forEach((sub, i) => {
             srtContent += `${i + 1}\n${formatSrtTime(sub.startSec)} --> ${formatSrtTime(sub.endSec)}\n${sub.text}\n\n`;
           });
 
-          // Run FFmpeg to hardcode captions into exported MP4
           statusOverlay.textContent = "Hardcoding subtitles into video file via FFmpeg WASM...";
           const ffmpeg = new FFmpeg();
           await ffmpeg.load();
@@ -272,7 +287,6 @@
           await ffmpeg.writeFile('input.mp4', await fetchFile(currentFile));
           await ffmpeg.writeFile('subtitles.srt', srtContent);
 
-          // Apply subtitle burn-in filter
           await ffmpeg.exec(['-i', 'input.mp4', '-vf', 'subtitles=subtitles.srt', 'output.mp4']);
 
           const data = await ffmpeg.readFile('output.mp4');
