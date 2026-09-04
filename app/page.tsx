@@ -107,7 +107,10 @@ export default function HomePage() {
       await ffmpeg.exec(["-i", "input.mp4", "-t", "15", "-vf", "silencedetect=noise=-30dB:d=0.5", "output.mp4"]);
 
       const data = await ffmpeg.readFile("output.mp4");
-      const processedBlob = new Blob([data], { type: "video/mp4" });
+      
+      // Type-safe buffer extraction
+      const buffer = data instanceof Uint8Array ? data.buffer : data;
+      const processedBlob = new Blob([buffer as BlobPart], { type: "video/mp4" });
       setVideoUrl(URL.createObjectURL(processedBlob));
 
       setStatusMessage("AI Video Processing Complete!");
