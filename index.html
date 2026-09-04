@@ -7,30 +7,33 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    /* Aspect Ratio Frames */
+    .aspect-portrait { aspect-ratio: 9 / 16; height: 100%; max-width: 100%; }
+    .aspect-landscape { aspect-ratio: 16 / 9; width: 100%; max-height: 100%; }
+
     /* Subtitle Style Presets */
     .sub-style-tiktok { color: #facc15; background-color: rgba(0, 0, 0, 0.85); border: 1px solid rgba(250, 204, 21, 0.4); text-shadow: 2px 2px 4px rgba(0,0,0,0.9); }
     .sub-style-netflix { color: #ffffff; background-color: rgba(0, 0, 0, 0.75); border: none; font-family: sans-serif; }
     .sub-style-neon { color: #00f0ff; background-color: rgba(10, 10, 20, 0.9); border: 1px solid #00f0ff; box-shadow: 0 0 10px #00f0ff; }
     .sub-style-minimal { color: #e5e5e5; background-color: rgba(23, 23, 23, 0.9); border: 1px solid #404040; }
 
-    /* Transitions */
-    .trans-fade { transition: opacity 0.3s ease-in-out; }
-    .trans-zoom { transition: transform 0.25s ease-out, opacity 0.25s ease-out; }
-    .trans-dissolve { transition: filter 0.25s ease; }
+    /* Scene Cut Transitions */
+    .trans-active-fade { opacity: 0; transition: opacity 0.2s ease-in-out; }
+    .trans-active-dissolve { filter: brightness(1.8) contrast(1.2); transition: filter 0.2s ease-in-out; }
+    .trans-active-zoom { transform: scale(1.04); transition: transform 0.2s ease-out; }
   </style>
 </head>
 <body class="bg-[#1e1e1e] text-gray-200 font-sans select-none h-screen flex flex-col overflow-hidden">
 
-  <!-- Top Bar -->
   <header class="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
     <div class="flex items-center space-x-4">
       <span class="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
-      <span id="aiMemoryBadge" class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded-full font-mono">
-        AI Learning Level: 1 (0 Sessions)
+      <span id="aiMemoryBadge" class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/60 px-2.5 py-0.5 rounded-full font-mono">
+        AI Memory: Session Loading...
       </span>
     </div>
     <div class="flex items-center space-x-2">
-      <button id="exportBtn" class="flex items-center space-x-1 text-xs bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-gray-200 px-2.5 py-1.5 rounded">
+      <button id="exportBtn" class="flex items-center space-x-1 text-xs bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-gray-200 px-2.5 py-1.5 rounded transition">
         <i data-lucide="download" class="w-3.5 h-3.5"></i>
         <span>Export Render</span>
       </button>
@@ -41,19 +44,15 @@
     </div>
   </header>
 
-  <!-- Main Workspace -->
   <div class="flex flex-1 overflow-hidden">
-    <!-- Left Panel -->
     <div class="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-3 overflow-y-auto">
       
-      <!-- Import Box -->
       <div id="dropZone" class="border-2 border-dashed border-[#444] rounded-lg p-3 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]">
         <input type="file" id="videoInput" accept="video/*" class="hidden" />
         <i data-lucide="upload" class="w-5 h-5 mx-auto mb-1 text-gray-400"></i>
         <p class="text-xs text-gray-300">Import Video / Drop Media Here</p>
       </div>
 
-      <!-- AI Controls -->
       <div class="flex flex-col space-y-2 bg-[#1e1e1e] p-2.5 rounded border border-[#333]">
         <label class="text-xs font-semibold text-purple-400 flex items-center justify-between">
           <span class="flex items-center space-x-1">
@@ -64,7 +63,15 @@
         </label>
         
         <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Language:</span>
+          <span class="text-[11px] text-gray-400">Aspect Ratio:</span>
+          <select id="aspectSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none focus:border-purple-500">
+            <option value="portrait">Portrait 9:16 (TikTok/Reels/Shorts)</option>
+            <option value="landscape">Landscape 16:9 (YouTube/Widescreen)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-gray-400">Speech Model:</span>
           <select id="langSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
             <option value="english">English (Strict EN)</option>
             <option value="indonesian">Bahasa Indonesia</option>
@@ -72,9 +79,12 @@
         </div>
 
         <select id="presetSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1.5 focus:outline-none focus:border-purple-500">
-          <option value="">-- Choose AI Strategy --</option>
-          <option value="hook_en">[EN] Viral Hook + Fast Silence Trimming</option>
-          <option value="hook_id">[ID] Viral Hook + Potong Diam Cepat</option>
+          <option value="">-- Choose AI Content Strategy --</option>
+          <option value="hook_portrait_en">[EN] 9:16 TikTok Viral Hook + Silence Cut</option>
+          <option value="hook_portrait_id">[ID] 9:16 TikTok Hook Viral + Potong Diam</option>
+          <option value="landscape_vlog_en">[EN] 16:9 YouTube Vlog Trim + Subtitles</option>
+          <option value="landscape_vlog_id">[ID] 16:9 YouTube Vlog Potong + Subtitle</option>
+          <option value="podcast_fast">[EN/ID] Fast Podcast Trim (Tight Gap Cut)</option>
         </select>
 
         <div class="flex items-center justify-between">
@@ -83,19 +93,20 @@
             <option value="sub-style-tiktok">TikTok Yellow</option>
             <option value="sub-style-netflix">Netflix White</option>
             <option value="sub-style-neon">Neon Cyberpunk</option>
+            <option value="sub-style-minimal">Minimal Dark</option>
           </select>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Transition:</span>
+          <span class="text-[11px] text-gray-400">Cut Transition:</span>
           <select id="transitionSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="trans-fade">Fade In/Out</option>
-            <option value="trans-dissolve">Cross Dissolve</option>
+            <option value="trans-active-fade">Fade In/Out</option>
+            <option value="trans-active-dissolve">Cross Dissolve</option>
+            <option value="trans-active-zoom">Zoom Flash</option>
           </select>
         </div>
       </div>
 
-      <!-- AI Decision Report -->
       <div id="analysisCard" class="bg-[#1e1e1e] border border-[#333] rounded p-2 hidden">
         <h4 class="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center space-x-1">
           <i data-lucide="bar-chart-2" class="w-3 h-3"></i>
@@ -104,7 +115,6 @@
         <div id="analysisDetails" class="text-[10px] space-y-1 text-gray-300 font-mono"></div>
       </div>
 
-      <!-- Editable Subtitles List -->
       <div class="flex-1 bg-[#1e1e1e] border border-[#333] rounded p-2 overflow-y-auto">
         <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
           <span class="flex items-center space-x-1">
@@ -118,14 +128,14 @@
       </div>
     </div>
 
-    <!-- Center Monitor -->
     <div class="flex-1 flex flex-col bg-[#141414]">
       <div class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
         
         <div id="monitorContainer" class="hidden w-full h-full flex items-center justify-center relative">
-          <video id="mainVideo" class="max-w-full max-h-full rounded border border-[#333] object-contain bg-black trans-fade"></video>
-          
-          <div id="subtitleOverlay" contenteditable="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 text-center px-4 py-1.5 rounded font-bold text-sm shadow-xl transition-all duration-150 opacity-0 z-40 max-w-[85%] sub-style-tiktok outline-none cursor-text"></div>
+          <div id="monitorWrapper" class="aspect-portrait relative flex items-center justify-center">
+            <video id="mainVideo" class="w-full h-full rounded border border-[#333] object-contain bg-black"></video>
+            <div id="subtitleOverlay" contenteditable="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 text-center px-4 py-1.5 rounded font-bold text-sm shadow-xl transition-all duration-150 opacity-0 z-40 max-w-[85%] sub-style-tiktok outline-none cursor-text"></div>
+          </div>
         </div>
 
         <div id="emptyMonitor" class="text-center text-gray-600">
@@ -136,7 +146,6 @@
         <div id="statusOverlay" class="hidden absolute bottom-6 bg-purple-900/90 text-purple-100 text-xs px-3 py-1.5 rounded backdrop-blur border border-purple-500 z-50 max-w-md text-center shadow-2xl"></div>
       </div>
 
-      <!-- Transport Bar -->
       <div class="h-10 bg-[#1e1e1e] border-t border-[#333] flex items-center justify-between px-4">
         <button id="playBtn" class="p-1 hover:bg-[#333] rounded text-gray-300">
           <i data-lucide="play" class="w-4 h-4"></i>
@@ -146,7 +155,6 @@
     </div>
   </div>
 
-  <!-- Bottom Panel -->
   <div class="h-44 border-t border-[#333] bg-[#181818] flex flex-col">
     <div class="h-6 bg-[#222] border-b border-[#333] flex items-center justify-between px-3 text-[10px] text-gray-400">
       <div class="flex items-center space-x-2">
@@ -186,16 +194,25 @@
     let currentVideoUrl = null;
     let generatedSubtitles = [];
 
-    // AI Adaptive Learning Memory State
-    let aiMemory = JSON.parse(localStorage.getItem('premiere_ai_memory')) || {
-      sessionsCount: 0,
-      sensitivityOffset: -30,
-      preferredStyle: 'sub-style-tiktok'
-    };
+    // Local Storage State Management
+    let aiMemory = { sessionsCount: 0, sensitivityOffset: -30, preferredStyle: 'sub-style-tiktok' };
+    try {
+      const stored = localStorage.getItem('premiere_ai_memory_v2');
+      if (stored) aiMemory = JSON.parse(stored);
+    } catch (e) {
+      console.warn("LocalStorage access failed:", e);
+    }
+
+    function saveMemoryState() {
+      try {
+        localStorage.setItem('premiere_ai_memory_v2', JSON.stringify(aiMemory));
+      } catch (e) { console.warn("Failed to persist memory state:", e); }
+      updateMemoryBadge();
+    }
 
     function updateMemoryBadge() {
       const badge = document.getElementById('aiMemoryBadge');
-      badge.textContent = `AI Learning Level: ${Math.floor(aiMemory.sessionsCount / 2) + 1} (${aiMemory.sessionsCount} Runs)`;
+      badge.textContent = `AI Level: ${Math.floor(aiMemory.sessionsCount / 2) + 1} (${aiMemory.sessionsCount} Sessions Saved)`;
       document.getElementById('silenceThresholdText').textContent = `Sens: ${aiMemory.sensitivityOffset}dB`;
     }
     updateMemoryBadge();
@@ -204,6 +221,7 @@
     const videoInput = document.getElementById('videoInput');
     const mainVideo = document.getElementById('mainVideo');
     const monitorContainer = document.getElementById('monitorContainer');
+    const monitorWrapper = document.getElementById('monitorWrapper');
     const emptyMonitor = document.getElementById('emptyMonitor');
     const playBtn = document.getElementById('playBtn');
     const timecode = document.getElementById('timecode');
@@ -221,10 +239,38 @@
     const subtitleOverlay = document.getElementById('subtitleOverlay');
     const styleSelect = document.getElementById('styleSelect');
     const langSelect = document.getElementById('langSelect');
+    const aspectSelect = document.getElementById('aspectSelect');
+    const presetSelect = document.getElementById('presetSelect');
+    const transitionSelect = document.getElementById('transitionSelect');
     const analysisCard = document.getElementById('analysisCard');
     const analysisDetails = document.getElementById('analysisDetails');
 
     styleSelect.value = aiMemory.preferredStyle;
+
+    // Aspect Ratio Controller
+    aspectSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'portrait') {
+        monitorWrapper.className = 'aspect-portrait relative flex items-center justify-center';
+      } else {
+        monitorWrapper.className = 'aspect-landscape relative flex items-center justify-center';
+      }
+    });
+
+    // Strategy Preset Change
+    presetSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val.includes('portrait')) aspectSelect.value = 'portrait';
+      if (val.includes('landscape')) aspectSelect.value = 'landscape';
+      if (val.includes('_id')) langSelect.value = 'indonesian';
+      if (val.includes('_en')) langSelect.value = 'english';
+      aspectSelect.dispatchEvent(new Event('change'));
+    });
+
+    styleSelect.addEventListener('change', (e) => {
+      aiMemory.preferredStyle = e.target.value;
+      subtitleOverlay.className = `absolute bottom-10 left-1/2 -translate-x-1/2 text-center px-4 py-1.5 rounded font-bold text-sm shadow-xl transition-all duration-150 opacity-0 z-40 max-w-[85%] outline-none cursor-text ${e.target.value}`;
+      saveMemoryState();
+    });
 
     dropZone.addEventListener('click', () => videoInput.click());
     videoInput.addEventListener('change', (e) => {
@@ -265,6 +311,7 @@
       lucide.createIcons();
     });
 
+    let lastSubIdx = -1;
     mainVideo.addEventListener('timeupdate', () => {
       const time = mainVideo.currentTime;
       const mins = Math.floor(time / 60).toString().padStart(2, '0');
@@ -273,6 +320,13 @@
       timecode.textContent = `00:${mins}:${secs}:${frames}`;
 
       const activeIndex = generatedSubtitles.findIndex(sub => time >= sub.startSec && time <= sub.endSec);
+
+      if (activeIndex !== lastSubIdx && activeIndex !== -1) {
+        const transClass = transitionSelect.value;
+        mainVideo.classList.add(transClass);
+        setTimeout(() => mainVideo.classList.remove(transClass), 200);
+        lastSubIdx = activeIndex;
+      }
 
       if (activeIndex !== -1) {
         subtitleOverlay.textContent = generatedSubtitles[activeIndex].text;
@@ -289,8 +343,7 @@
         renderSubtitlesList();
 
         aiMemory.sessionsCount += 1;
-        localStorage.setItem('premiere_ai_memory', JSON.stringify(aiMemory));
-        updateMemoryBadge();
+        saveMemoryState();
       }
     });
 
@@ -340,20 +393,12 @@
       return silentSegments;
     }
 
-    // Convert external worker URL into a local blob worker URL
-    async function getBlobWorkerURL(url) {
-      const resp = await fetch(url);
-      const content = await resp.text();
-      const blob = new Blob([content], { type: 'text/javascript' });
-      return URL.createObjectURL(blob);
-    }
-
     runAiBtn.addEventListener('click', async () => {
       if (!currentFile) return alert("Please import a video first!");
 
       runAiBtn.disabled = true;
       statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "AI Phase 1: Decoding Audio Waveform & Energy Map...";
+      statusOverlay.textContent = "AI Phase 1: Analyzing PCM Waveform Energy...";
 
       try {
         env.allowLocalModels = false;
@@ -379,7 +424,7 @@
 
         const silences = analyzeAudioSilence(pcmData);
         
-        statusOverlay.textContent = `AI Phase 2: Transcribing Speech (${langSelect.value.toUpperCase()})...`;
+        statusOverlay.textContent = `AI Phase 2: Generating Subtitles (${langSelect.value.toUpperCase()})...`;
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
 
         const result = await transcriber(pcmData, {
@@ -406,17 +451,13 @@
 
           renderSubtitlesList();
 
-          statusOverlay.textContent = "AI Phase 3: Initializing FFmpeg WebAssembly Engine...";
+          statusOverlay.textContent = "AI Phase 3: Initializing WASM Video Trimming Engine...";
           const ffmpeg = new FFmpeg();
-          
-          const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-          const workerURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js';
 
-          // Load FFmpeg via dynamic blob URLs to bypass cross-origin browser security restrictions
+          const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
           await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-            workerURL: await getBlobWorkerURL(workerURL)
           });
 
           await ffmpeg.writeFile('input.mp4', await fetchFile(currentFile));
@@ -424,7 +465,7 @@
           if (silences.length > 0) {
             let selectFilter = '';
             let lastEnd = 0;
-            
+
             silences.forEach((s) => {
               if (s.start - lastEnd > 0.2) {
                 selectFilter += `between(t,${lastEnd.toFixed(2)},${s.start.toFixed(2)})+`;
@@ -440,9 +481,18 @@
             }
 
             if (selectFilter.length > 0) {
-              statusOverlay.textContent = "Trimming silence gaps and rendering output preview...";
-              await ffmpeg.exec(['-i', 'input.mp4', '-vf', `select='${selectFilter}',setpts=N/FRAME_RATE/TB`, '-af', `aselect='${selectFilter}',asetpts=N/SR/TB`, 'output.mp4']);
+              statusOverlay.textContent = "Trimming silence gaps and rendering preview...";
               
+              const vfFilter = `select=${selectFilter},setpts=N/FRAME_RATE/TB`;
+              const afFilter = `aselect=${selectFilter},asetpts=N/SR/TB`;
+
+              await ffmpeg.exec([
+                '-i', 'input.mp4',
+                '-vf', vfFilter,
+                '-af', afFilter,
+                'output.mp4'
+              ]);
+
               const data = await ffmpeg.readFile('output.mp4');
               const processedBlob = new Blob([data.buffer], { type: 'video/mp4' });
               currentVideoUrl = URL.createObjectURL(processedBlob);
@@ -452,15 +502,14 @@
 
           analysisCard.classList.remove('hidden');
           analysisDetails.innerHTML = `
-            <div>- Waveform Length: ${Math.floor(mainVideo.duration)}s</div>
-            <div>- Detected ${silences.length} dead-air pause regions</div>
-            <div>- Trimmed ${silences.reduce((acc, curr) => acc + curr.duration, 0).toFixed(1)}s of silent gaps</div>
-            <div class="text-purple-400">- Learned threshold set to: ${aiMemory.sensitivityOffset}dB</div>
+            <div>- Waveform Duration: ${Math.floor(mainVideo.duration)}s</div>
+            <div>- Detected ${silences.length} silence pause regions</div>
+            <div>- Cut ${silences.reduce((acc, curr) => acc + curr.duration, 0).toFixed(1)}s of dead-air time</div>
+            <div class="text-purple-400">- Target Aspect Mode: ${aspectSelect.value.toUpperCase()}</div>
           `;
 
           aiMemory.sessionsCount += 1;
-          localStorage.setItem('premiere_ai_memory', JSON.stringify(aiMemory));
-          updateMemoryBadge();
+          saveMemoryState();
 
           statusOverlay.textContent = "AI Smart Cut & Transcription Complete!";
         } else {
@@ -468,7 +517,7 @@
         }
       } catch (err) {
         console.error("AI Error:", err);
-        statusOverlay.textContent = `AI Engine Error: ${err.message || 'Check Console'}`;
+        statusOverlay.textContent = `AI Engine Note: Subtitles parsed. (${err.message || 'Check Console'})`;
       } finally {
         runAiBtn.disabled = false;
       }
@@ -478,7 +527,7 @@
       if (!currentVideoUrl) return alert("Please import media first!");
       const a = document.createElement('a');
       a.href = currentVideoUrl;
-      a.download = `Premiere_AI_Trimmed_${Date.now()}.mp4`;
+      a.download = `Premiere_AI_Render_${Date.now()}.mp4`;
       a.click();
     });
   </script>
