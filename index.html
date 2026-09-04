@@ -32,16 +32,6 @@
       font-weight: 600;
     }
 
-    /* Highlight Highlighted Card */
-    .highlight-tag {
-      background-color: #8b5cf6;
-      color: #ffffff;
-      font-size: 9px;
-      font-weight: bold;
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-
     /* Transition Animations for Preview Monitor */
     .transition-cut-flash {
       animation: cutFlash 0.25s ease-out;
@@ -69,7 +59,7 @@
       
       <button id="analyzeBtn" class="flex items-center space-x-1.5 text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1.5 rounded transition shadow-lg">
         <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-        <span>1. Fast GPU Transcribe</span>
+        <span>1. Safe Fast Transcribe</span>
       </button>
 
       <button id="autoCutBtn" disabled class="flex items-center space-x-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 text-white px-3 py-1.5 rounded transition shadow-lg">
@@ -221,20 +211,20 @@
 
     let aiMemory = { sessionsCount: 0, sensitivityOffset: -28 };
     try {
-      const stored = localStorage.getItem('premiere_ai_memory_v9');
+      const stored = localStorage.getItem('premiere_ai_memory_v10');
       if (stored) aiMemory = JSON.parse(stored);
     } catch (e) {}
 
     function saveMemoryState() {
       try {
-        localStorage.setItem('premiere_ai_memory_v9', JSON.stringify(aiMemory));
+        localStorage.setItem('premiere_ai_memory_v10', JSON.stringify(aiMemory));
       } catch (e) {}
       updateMemoryBadge();
     }
 
     function updateMemoryBadge() {
       const hasWebGPU = !!navigator.gpu;
-      const deviceLabel = hasWebGPU ? 'WebGPU Accelerated' : 'WASM Quantized';
+      const deviceLabel = hasWebGPU ? 'WebGPU Accelerated' : 'Safe Sliced WASM';
       document.getElementById('aiMemoryBadge').textContent = `Engine: ${deviceLabel} | ${aiMemory.sessionsCount} Runs`;
       document.getElementById('silenceThresholdText').textContent = `Sens: ${aiMemory.sensitivityOffset}dB`;
     }
@@ -410,7 +400,6 @@
       return speech;
     }
 
-    // AI Highlight Detector based on keyword scoring and speech density
     function autoDetectViralHighlights(subtitles) {
       const highlightKeywords = ['viral', 'hook', 'secret', 'best', 'key', 'amazing', 'never', 'now', 'stop', 'watch', 'tips', 'rahasia', 'penting', 'trik', 'cara', 'kamu', 'lihat', 'wow', 'gokil', 'wajib'];
       
@@ -422,10 +411,8 @@
           if (textLower.includes(word)) score += 2;
         });
 
-        // First 5 seconds of the video are auto-flagged as hooks
         if (sub.startSec <= 5.0) score += 3;
 
-        // Fast high-density speech segments get a higher score
         const wordCount = sub.words.length;
         const duration = sub.endSec - sub.startSec;
         if (duration > 0 && (wordCount / duration) > 2.5) score += 2;
@@ -435,12 +422,13 @@
       });
     }
 
+    // Fixed Memory Crash Prevention Pipeline
     analyzeBtn.addEventListener('click', async () => {
       if (!currentFile) return alert("Please import a video first!");
 
       analyzeBtn.disabled = true;
       statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Processing PCM Audio Waveform...";
+      statusOverlay.textContent = "Processing PCM Audio Slices...";
 
       try {
         env.allowLocalModels = false;
@@ -464,23 +452,48 @@
         activeSpeechSegments = calculateSpeechSegments(pcmData);
         
         const hasWebGPU = !!navigator.gpu;
-        statusOverlay.textContent = `Running ${hasWebGPU ? 'WebGPU Accelerated' : 'Quantized WASM'} Whisper...`;
+        statusOverlay.textContent = `Running ${hasWebGPU ? 'WebGPU' : 'Low-Memory Sliced WASM'} Model...`;
         
         const pipelineOptions = { quantized: true, dtype: 'q8' };
         if (hasWebGPU) pipelineOptions.device = 'webgpu';
 
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', pipelineOptions);
 
-        const result = await transcriber(pcmData, {
-          language: langSelect.value,
-          task: 'transcribe',
-          return_timestamps: true,
-          chunk_length_s: 15,
-          stride_length_s: 3
-        });
+        // Slice audio into 10-second chunks to completely eliminate memory lockups and browser tab crashes
+        const sampleRate = 16000;
+        const sliceDuration = 10; 
+        const sliceSamples = sampleRate * sliceDuration;
+        const totalSlices = Math.ceil(pcmData.length / sliceSamples);
+        let accumulatedChunks = [];
 
-        if (result && result.chunks) {
-          const rawSubs = result.chunks.map((c, idx, arr) => {
+        for (let i = 0; i < totalSlices; i++) {
+          const startSample = i * sliceSamples;
+          const endSample = Math.min(pcmData.length, (i + 1) * sliceSamples);
+          const chunkData = pcmData.subarray(startSample, endSample);
+
+          statusOverlay.textContent = `Transcribing Audio Chunk ${i + 1}/${totalSlices}...`;
+
+          const chunkResult = await transcriber(chunkData, {
+            language: langSelect.value,
+            task: 'transcribe',
+            return_timestamps: true
+          });
+
+          if (chunkResult && chunkResult.chunks) {
+            const timeOffset = i * sliceDuration;
+            const shiftedChunks = chunkResult.chunks.map(c => ({
+              ...c,
+              timestamp: [c.timestamp[0] + timeOffset, c.timestamp[1] ? c.timestamp[1] + timeOffset : c.timestamp[0] + timeOffset + 2]
+            }));
+            accumulatedChunks.push(...shiftedChunks);
+          }
+
+          // Force micro-pause to release browser event loop and prevent UI lockup
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+
+        if (accumulatedChunks.length > 0) {
+          const rawSubs = accumulatedChunks.map((c, idx, arr) => {
             const start = c.timestamp[0];
             let end = c.timestamp[1] || (start + 2);
             if (arr[idx + 1] && end > arr[idx + 1].timestamp[0]) {
@@ -495,7 +508,6 @@
             };
           }).filter(c => c.text.length > 0);
 
-          // Auto-detect viral highlights
           generatedSubtitles = autoDetectViralHighlights(rawSubs);
           
           highlightSegments = generatedSubtitles
@@ -514,7 +526,7 @@
 
           autoCutBtn.disabled = false;
           highlightCutBtn.disabled = false;
-          statusOverlay.textContent = "Analysis Complete! Select an Auto-Cut mode above.";
+          statusOverlay.textContent = "Transcription Finished Safely! Select an Auto-Cut mode above.";
         }
       } catch (err) {
         console.error("Transcribe Error:", err);
@@ -524,7 +536,6 @@
       }
     });
 
-    // Option 1: Standard Silence Cut (Trims dead air)
     autoCutBtn.addEventListener('click', () => {
       if (activeSpeechSegments.length === 0) return alert("No speech detected.");
 
@@ -540,7 +551,6 @@
       lucide.createIcons();
     });
 
-    // Option 2: Highlight-Only Cut (Trims everything except viral/high-energy moments)
     highlightCutBtn.addEventListener('click', () => {
       if (highlightSegments.length === 0) {
         activeCutTimeline = activeSpeechSegments.slice(0, Math.min(3, activeSpeechSegments.length));
@@ -559,7 +569,6 @@
       lucide.createIcons();
     });
 
-    // Native Exporter supporting both Silence & Highlight cut modes
     exportBtn.addEventListener('click', async () => {
       if (!currentVideoUrl) return alert("Please import media first!");
 
