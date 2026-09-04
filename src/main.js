@@ -7,7 +7,7 @@ import { pipeline, env } from '@huggingface/transformers';
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
-const MODEL = 'Xenova/whisper-small';
+const MODEL = 'onnx-community/whisper-small';
 
 const state = {
   lang: 'en',
@@ -331,39 +331,30 @@ async function ensureFFmpeg() {
   if (state.ffmpegReady) return state.ffmpeg;
   status('Loading render engine…','busy');
   const ff = new FFmpeg();
-  ff.on('progress', ({progress:p}) => progress(Math.round(p*100)));
+  ff.on('log', ({ message }) => console.debug('[FFmpeg]', message));
+  ff.on('progress', ({ progress:p }) => progress(Math.round(p*100)));
   state.ffmpeg = ff;
   try {
-    // IMPORTANT: never construct the FFmpeg Worker directly from a CDN URL.
-    // Fetch each asset and turn it into a same-page blob URL. This avoids the
-    // cross-origin Worker error that affected the previous implementation.
+    // FFmpeg 0.12 creates its *class worker* with new Worker(). The worker
+    // itself must be same-origin. Hosting it in /public/ffmpeg prevents the
+    // exact cross-origin Worker error from the old CDN implementation.
     const coreBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
-    const ffmpegBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm';
-
-    const coreURL = await toBlobURL(
-      `${coreBase}/ffmpeg-core.js`,
-      'text/javascript'
-    );
-    const wasmURL = await toBlobURL(
-      `${coreBase}/ffmpeg-core.wasm`,
-      'application/wasm'
-    );
-    const workerURL = await toBlobURL(
-      `${ffmpegBase}/worker.js`,
-      'text/javascript'
-    );
-
-    await ff.load({ coreURL, wasmURL, workerURL });
+    await ff.load({
+      coreURL: `${coreBase}/ffmpeg-core.js`,
+      wasmURL: `${coreBase}/ffmpeg-core.wasm`,
+      classWorkerURL: `${location.origin}/ffmpeg/worker.js`
+    });
   } catch (e) {
     console.error(e);
+    state.ffmpeg = null;
+    state.ffmpegReady = false;
     status('Render engine failed','error');
-    throw e;
+    throw new Error(`FFmpeg could not start. Make sure /public/ffmpeg/worker.js is deployed. ${e?.message || e}`);
   }
   state.ffmpegReady=true;
   status('Render engine ready');
   return ff;
 }
-
 async function ensureTranscriber() {
   if (state.transcriber) return state.transcriber;
   status('Loading local Whisper AI…','busy');
@@ -372,7 +363,10 @@ async function ensureTranscriber() {
   try {
     state.transcriber = await pipeline('automatic-speech-recognition', MODEL, {
       device,
-      dtype: device === 'webgpu' ? 'q8' : 'q8'
+      dtype: device === 'webgpu' ? { encoder_model: 'fp16', decoder_model_merged: 'q4' } : 'q8',
+      progress_callback: (x) => {
+        if (typeof x?.progress === 'number') progress(Math.round(x.progress));
+      }
     });
   } catch (e) {
     console.warn('WebGPU Whisper failed, retrying WASM', e);
@@ -389,7 +383,7 @@ async function extractWav(asset) {
   await ff.exec(['-i',input,'-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','audio.wav']);
   const data=await ff.readFile('audio.wav');
   try { await ff.deleteFile(input); await ff.deleteFile('audio.wav'); } catch {}
-  return new Blob([data.buffer],{type:'audio/wav'});
+  return new Blob([data instanceof Uint8Array ? data : new Uint8Array(data)],{type:'audio/wav'});
 }
 
 async function transcribeSelected() {
@@ -405,7 +399,7 @@ async function transcribeSelected() {
       chunk_length_s:30,
       stride_length_s:5,
       return_timestamps:true,
-      language: state.lang === 'id' ? 'indonesian' : undefined
+      language: state.lang === 'id' ? 'indonesian' : 'english'
     });
     URL.revokeObjectURL(url);
     const chunks=result.chunks||[];
@@ -547,7 +541,7 @@ async function renderVideo() {
       output
     ]);
     const data=await ff.readFile(output);
-    const blob=new Blob([data.buffer],{type:'video/mp4'});
+    const blob=new Blob([data instanceof Uint8Array ? data : new Uint8Array(data)],{type:'video/mp4'});
     if(state.outputUrl)URL.revokeObjectURL(state.outputUrl);
     state.outputUrl=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=state.outputUrl;a.download=`claude-${state.plan.aspect.replace(':','x')}-marketing.mp4`;a.click();

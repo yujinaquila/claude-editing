@@ -46,7 +46,7 @@ The editor's natural-language edit planner is intentionally local and determinis
 
 ## FFmpeg CORS fix
 
-FFmpeg assets are loaded from the installed npm packages and passed to the browser through blob URLs. The app does not construct a Worker directly from a cross-origin CDN URL.
+The FFmpeg class worker is self-hosted at `/ffmpeg/worker.js` (with its local `const.js` and `errors.js` dependencies). The FFmpeg core/WASM can still be fetched from the CDN. This avoids the browser error where `worker.js` is constructed from a different origin than the Vercel app. The setup follows the FFmpeg.wasm 0.12 worker architecture.
 
 ## Important
 
