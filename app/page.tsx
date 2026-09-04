@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   Play, Pause, Scissors, Sparkles, Upload, 
-  Subtitles, Video, Layers, RefreshCw, Download, RotateCcw
+  Subtitles, Video, Layers, RefreshCw, Download, RotateCcw, Loader2
 } from "lucide-react";
 
 const PROMPT_TEMPLATES = [
@@ -100,7 +100,6 @@ export default function HomePage() {
     document.body.removeChild(a);
   };
 
-  // Extracts 16kHz PCM mono audio buffer for Whisper processing
   const extractAudioData = async (file: File): Promise<Float32Array> => {
     const arrayBuffer = await file.arrayBuffer();
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
@@ -108,7 +107,6 @@ export default function HomePage() {
     return decodedAudio.getChannelData(0);
   };
 
-  // Client-Side AI Pipeline Execution
   const runAIPipeline = async () => {
     if (typeof window === "undefined") return;
     if (!videoFile) return alert("Please import a video first / Silakan impor video terlebih dahulu.");
@@ -117,10 +115,8 @@ export default function HomePage() {
     setStatusMessage("Extracting audio stream (16kHz PCM)...");
 
     try {
-      // Step 1: Decode Audio Buffer
       const audioBuffer = await extractAudioData(videoFile);
 
-      // Step 2: Run Whisper AI Transcription
       setStatusMessage("Loading Whisper AI Tiny model...");
       const { pipeline, env } = await import("@xenova/transformers");
       env.allowLocalModels = false;
@@ -137,7 +133,6 @@ export default function HomePage() {
 
       const output = (Array.isArray(rawOutput) ? rawOutput[0] : rawOutput) as any;
 
-      // Format generated transcript items into subtitle list
       if (output && output.chunks && Array.isArray(output.chunks)) {
         const formattedCaptions = output.chunks.map((chunk: any) => {
           const startSec = Math.floor(chunk.timestamp[0] || 0);
@@ -155,7 +150,6 @@ export default function HomePage() {
         ]);
       }
 
-      // Step 3: Run FFmpeg Video Processing
       setStatusMessage("Loading FFmpeg WASM engine...");
       const { FFmpeg } = await import("@ffmpeg/ffmpeg");
       const { fetchFile } = await import("@ffmpeg/util");
@@ -190,13 +184,11 @@ export default function HomePage() {
       className="flex flex-col h-screen bg-[#1e1e1e] text-gray-200 font-sans select-none overflow-hidden"
       onClick={() => setActiveMenu(null)}
     >
-      {/* Top Header Menu Bar */}
       <header className="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
         <div className="flex items-center space-x-4">
           <span className="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
           
           <nav className="flex space-x-1 text-xs text-gray-300 relative">
-            {/* File Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "file" ? null : "file")}
@@ -223,7 +215,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Edit Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "edit" ? null : "edit")}
@@ -243,7 +234,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Sequence Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "sequence" ? null : "sequence")}
@@ -261,7 +251,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Graphics Menu */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveMenu(activeMenu === "graphics" ? null : "graphics")}
@@ -288,7 +277,8 @@ export default function HomePage() {
         <div className="flex items-center space-x-2">
           <button 
             onClick={exportVideo}
-            className="flex items-center space-x-1 text-xs bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-gray-200 px-2.5 py-1.5 rounded transition"
+            disabled={isProcessing}
+            className="flex items-center space-x-1 text-xs bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-gray-200 px-2.5 py-1.5 rounded transition disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export</span>
@@ -296,17 +286,19 @@ export default function HomePage() {
           <button 
             onClick={runAIPipeline}
             disabled={isProcessing}
-            className="flex items-center space-x-1 text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded transition disabled:opacity-50"
+            className="flex items-center space-x-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded transition disabled:opacity-50 shadow-lg shadow-purple-900/30"
           >
-            {isProcessing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            <span>{isProcessing ? "Processing..." : "Run AI Script"}</span>
+            {isProcessing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-200" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            <span>{isProcessing ? "Processing AI..." : "Run AI Script"}</span>
           </button>
         </div>
       </header>
 
-      {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel: Media & Control */}
         <div className="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-4">
           <div 
             onClick={() => fileInputRef.current?.click()}
@@ -368,7 +360,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Center Panel: Program Monitor */}
+        {/* Center Panel: Program Monitor with Loading Overlay */}
         <div className="flex-1 flex flex-col bg-[#141414]">
           <div className="flex-1 flex items-center justify-center p-4 relative">
             {videoUrl ? (
@@ -386,7 +378,20 @@ export default function HomePage() {
               </div>
             )}
             
-            {statusMessage && (
+            {/* Fullscreen Loading Overlay when AI runs */}
+            {isProcessing && (
+              <div className="absolute inset-0 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center space-y-3 z-40 animate-fade-in">
+                <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-white tracking-wide">AI Engine Working...</p>
+                  <p className="text-xs text-purple-300 font-mono bg-purple-950/80 px-3 py-1 rounded border border-purple-800/50">
+                    {statusMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!isProcessing && statusMessage && (
               <div className="absolute bottom-6 bg-purple-900/90 text-purple-100 text-xs px-3 py-1 rounded backdrop-blur border border-purple-500">
                 {statusMessage}
               </div>
@@ -407,7 +412,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Bottom Panel: Timeline */}
       <div className="h-48 border-t border-[#333] bg-[#181818] flex flex-col">
         <div className="h-6 bg-[#222] border-b border-[#333] flex items-center px-3 text-[10px] text-gray-400 space-x-2">
           <Layers className="w-3 h-3" />
