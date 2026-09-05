@@ -6,6 +6,34 @@
   <meta name="theme-color" content="#09090b" />
   <meta name="description" content="Claude AI Editor — prompt-driven marketing video editor" />
   <title>Claude AI Editor</title>
+  <script>
+    // Preview fix: main.js creates the asset Blob URL, then its metadata
+    // helper was revoking that same URL. Keep video File URLs alive until
+    // the page is unloaded so the preview can actually decode/play them.
+    (() => {
+      const originalCreate = URL.createObjectURL.bind(URL);
+      const originalRevoke = URL.revokeObjectURL.bind(URL);
+      const mediaUrls = new Set();
+
+      URL.createObjectURL = (object) => {
+        const url = originalCreate(object);
+        if (object instanceof File && /^video\\//i.test(object.type)) {
+          mediaUrls.add(url);
+        }
+        return url;
+      };
+
+      URL.revokeObjectURL = (url) => {
+        if (mediaUrls.has(url)) return;
+        originalRevoke(url);
+      };
+
+      window.addEventListener('beforeunload', () => {
+        for (const url of mediaUrls) originalRevoke(url);
+        mediaUrls.clear();
+      });
+    })();
+  </script>
 </head>
 <body>
   <div id="app"></div>
