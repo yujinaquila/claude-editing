@@ -2,10 +2,12 @@
 import './styles.css';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { pipeline, env } from '@huggingface/transformers';
 
-env.allowLocalModels = false;
-env.useBrowserCache = true;
+// Transformers.js is loaded only in the browser. Keeping it out of the npm
+// dependency tree prevents Vercel from trying to install onnxruntime-node,
+// which is not needed for this browser-only ASR implementation.
+const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/+esm';
+let transformersModule = null;
 
 const MODEL = 'onnx-community/whisper-small';
 
@@ -224,7 +226,7 @@ function getAspectSize(aspect) {
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function renderAssets() {
@@ -284,6 +286,9 @@ function selectAsset(id) {
   if (a.transcript?.length) {
     state.transcript=a.transcript;
     renderTranscript();
+  } else {
+    state.transcript=[];
+    renderTranscript();
   }
   renderTimeline();
 }
@@ -335,9 +340,6 @@ async function ensureFFmpeg() {
   ff.on('progress', ({ progress:p }) => progress(Math.round(p*100)));
   state.ffmpeg = ff;
   try {
-    // FFmpeg 0.12 creates its *class worker* with new Worker(). The worker
-    // itself must be same-origin. Hosting it in /public/ffmpeg prevents the
-    // exact cross-origin Worker error from the old CDN implementation.
     const coreBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
     await ff.load({
       coreURL: `${coreBase}/ffmpeg-core.js`,
@@ -355,12 +357,19 @@ async function ensureFFmpeg() {
   status('Render engine ready');
   return ff;
 }
+
 async function ensureTranscriber() {
   if (state.transcriber) return state.transcriber;
   status('Loading local Whisper AI…','busy');
   toast('First transcription downloads the free multilingual Whisper model and may take a while.');
-  const device = navigator.gpu ? 'webgpu' : 'wasm';
   try {
+    if (!transformersModule) {
+      transformersModule = await import(/* @vite-ignore */ TRANSFORMERS_URL);
+      transformersModule.env.allowLocalModels = false;
+      transformersModule.env.useBrowserCache = true;
+    }
+    const { pipeline } = transformersModule;
+    const device = navigator.gpu ? 'webgpu' : 'wasm';
     state.transcriber = await pipeline('automatic-speech-recognition', MODEL, {
       device,
       dtype: device === 'webgpu' ? 'q4' : 'q8',
@@ -370,16 +379,18 @@ async function ensureTranscriber() {
     });
   } catch (e) {
     console.warn('WebGPU Whisper failed, retrying WASM', e);
-    state.transcriber = await pipeline('automatic-speech-recognition', MODEL, { device:'wasm', dtype:'q8' });
+    if (!transformersModule) {
+      transformersModule = await import(/* @vite-ignore */ TRANSFORMERS_URL);
+      transformersModule.env.allowLocalModels = false;
+      transformersModule.env.useBrowserCache = true;
+    }
+    state.transcriber = await transformersModule.pipeline('automatic-speech-recognition', MODEL, { device:'wasm', dtype:'q8' });
   }
   status('Whisper AI ready');
   return state.transcriber;
 }
 
 async function extractAudioData(asset) {
-  // Do not route transcription through FFmpeg. FFmpeg's WASM worker is useful
-  // for rendering, but browser-native decoding is much more reliable for ASR.
-  // Transformers.js expects a mono Float32 waveform at 16 kHz.
   const buffer = await asset.file.arrayBuffer();
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -454,7 +465,7 @@ async function transcribeSelected() {
 
 function buildPlan(prompt) {
   const p=(prompt||'').toLowerCase();
-  const id = /buat|bikin|bahasa indonesia|indonesia|detik|iklan|jualan|reels|tiktok/.test(p);
+  const id = /buat|bikin|bahasa indonesia|indonesia|detik|iklan|jualan|reels|tiktok|vertikal/.test(p);
   let duration=state.plan.duration;
   const m=p.match(/(\d+)\s*(s|sec|second|seconds|detik)/);
   if(m) duration=Math.max(5,Math.min(180,Number(m[1])));
@@ -495,7 +506,6 @@ function bestHook() {
 
 function autoCutSegments() {
   if (!state.transcript.length) return [];
-  // Transcript-aware cut: retain spoken segments with small padding.
   const out=[];
   for(const s of state.transcript){
     if(!s.text) continue;
@@ -509,7 +519,6 @@ function autoCutSegments() {
 
 function pickBestAssets() {
   if(!state.assets.length) return;
-  // AI-assisted scoring: transcript density + useful keywords + duration sanity.
   const useful=['product','result','before','after','how','why','cara','produk','hasil','masalah','solution','solusi','buy','beli'];
   const ranked=state.assets.map(a=>{
     const text=(a.transcript||[]).map(s=>s.text).join(' ').toLowerCase();
@@ -561,7 +570,6 @@ async function renderVideo() {
     if(end<=start) end=Math.min(asset.duration,start+state.plan.duration);
     const duration=Math.min(state.plan.duration,end-start);
     status('Rendering marketing video…','busy');progress(5);
-    // Single-clip browser render. The transcript-aware cut/hook planner chooses the strongest starting region.
     await ff.exec([
       '-ss',String(start),
       '-i',input,
