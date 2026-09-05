@@ -145,6 +145,9 @@
   .media-dur{font-size:10.5px;color:var(--muted-2);}
   .media-tag{display:inline-block;font-size:9.5px;font-weight:700;color:var(--ai);background:var(--ai-dim);
     padding:1px 5px;border-radius:4px;margin-top:2px;}
+  .media-add-btn{flex:none;width:24px;height:24px;border-radius:6px;background:var(--ai-dim);color:var(--ai);
+    border:none;font-size:15px;font-weight:700;line-height:1;}
+  .media-add-btn:hover{background:var(--ai);color:#fff;}
 
   .section-label{font-size:11px;text-transform:none;color:var(--muted);font-weight:600;margin:14px 0 8px;
     display:flex;align-items:center;justify-content:space-between;}
@@ -179,6 +182,11 @@
   .tr-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
     width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;}
   .tr-time{font-size:11.5px;color:var(--muted);}
+  .subtitle-overlay{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);
+    display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:86%;pointer-events:none;}
+  .subtitle-overlay .word{background:rgba(0,0,0,.72);color:#fff;font-weight:800;font-size:clamp(14px,3vw,26px);
+    padding:3px 9px;border-radius:6px;text-transform:uppercase;letter-spacing:.3px;}
+  .subtitle-overlay .word.active{background:var(--ai);color:#fff;}
 
   /* right panel */
   #right{grid-area:right;border-left:1px solid var(--border);background:var(--panel);
@@ -204,7 +212,7 @@
   .tl-hint{font-size:11px;color:var(--muted-2);}
   #tlScroll{flex:1;overflow-x:auto;overflow-y:hidden;padding:14px;}
   .tl-track-label{font-size:10.5px;color:var(--muted);margin-bottom:6px;}
-  .tl-track{display:flex;gap:3px;height:64px;min-width:100%;align-items:stretch;}
+  .tl-track{display:flex;gap:3px;height:64px;min-width:100%;align-items:stretch;position:relative;}
   .tl-clip{position:relative;background:linear-gradient(180deg,var(--clip),#22223a);
     border:1.5px solid var(--clip-border);border-radius:7px;flex:none;height:100%;
     display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;cursor:grab;}
@@ -219,6 +227,9 @@
   .trim-handle:hover{background:rgba(124,92,255,.5);}
   .tl-empty{color:var(--muted-2);font-size:12px;padding:20px 0;}
   .silence-mark{position:absolute;bottom:0;top:0;background:repeating-linear-gradient(45deg,rgba(255,84,112,.25),rgba(255,84,112,.25) 3px,transparent 3px,transparent 6px);}
+  .highlight-mark{position:absolute;top:0;height:5px;background:var(--ok);border-radius:0 0 3px 3px;}
+  .tl-playhead{position:absolute;top:0;bottom:0;left:0;width:2px;background:var(--render);
+    box-shadow:0 0 6px rgba(255,84,112,.8);pointer-events:none;transition:transform .05s linear;}
 
   /* toast / loading */
   #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-2);
@@ -284,7 +295,7 @@
       <button class="btn-render" onclick="openRenderModal()">
         <span>⤓</span><span data-i18n="renderBtn">Render &amp; Export</span>
       </button>
-      <div class="avatar" id="avatarInit">?</div>
+      <div class="avatar" id="avatarInit" onclick="confirmSignOut()" title="Sign out" style="cursor:pointer">?</div>
     </div>
   </div>
 
@@ -347,6 +358,7 @@
   <div id="center">
     <div id="previewWrap">
       <video id="previewVideo" controls></video>
+      <div id="subtitleOverlay" class="subtitle-overlay hidden"></div>
       <div id="emptyPreview">
         <div class="em-mark">▶</div>
         <div data-i18n="emptyPreview">Import a clip and click it to preview</div>
@@ -631,16 +643,47 @@ sb.auth.onAuthStateChange((event, session)=>{
   if(session && session.user && !user){
     const u = userFromSupabase(session.user);
     completeLogin(u.name, u.email, u.picture);
+    cleanAuthParamsFromUrl();
   }
 });
 
-window.addEventListener('load', async ()=>{
-  const { data } = await sb.auth.getSession();
-  if(data && data.session && data.session.user){
-    const u = userFromSupabase(data.session.user);
-    completeLogin(u.name, u.email, u.picture);
+// Run immediately (don't wait for the page 'load' event — that waits on
+// every subresource, including web fonts, and can fire late or hang on a
+// slow/blocked connection, which was causing the post-Google-redirect
+// screen to sit on the login page instead of opening the editor).
+(async ()=>{
+  try{
+    const { data, error } = await sb.auth.getSession();
+    if(error){ console.error('getSession error', error); }
+    if(data && data.session && data.session.user){
+      const u = userFromSupabase(data.session.user);
+      await completeLogin(u.name, u.email, u.picture);
+      cleanAuthParamsFromUrl();
+    } else if(location.hash.includes('access_token') || location.search.includes('code=')){
+      // We came back from Google but Supabase hasn't resolved a session yet
+      // (still parsing the redirect). Give it a moment, then check again.
+      setTimeout(async ()=>{
+        const retry = await sb.auth.getSession();
+        if(retry.data && retry.data.session && retry.data.session.user){
+          const u = userFromSupabase(retry.data.session.user);
+          await completeLogin(u.name, u.email, u.picture);
+          cleanAuthParamsFromUrl();
+        } else {
+          showToast(currentLang==='id'
+            ? 'Google berhasil masuk, tapi sesi gagal dimuat — coba refresh halaman'
+            : 'Google sign-in succeeded, but the session failed to load — try refreshing');
+        }
+      }, 800);
+    }
+  }catch(err){
+    console.error('Session check failed', err);
   }
-});
+})();
+function cleanAuthParamsFromUrl(){
+  if(location.hash.includes('access_token') || location.search.includes('code=')){
+    history.replaceState(null, '', window.location.origin + window.location.pathname);
+  }
+}
 
 document.getElementById('loginBtn').addEventListener('click', ()=>{
   const name = document.getElementById('loginName').value.trim() || 'Guest';
@@ -651,6 +694,10 @@ document.getElementById('loginBtn').addEventListener('click', ()=>{
 async function signOut(){
   try{ await sb.auth.signOut(); }catch(e){}
   location.reload();
+}
+function confirmSignOut(){
+  const msg = currentLang==='id' ? 'Keluar dari akun ini?' : 'Sign out of this account?';
+  if(confirm(msg)) signOut();
 }
 
 /* ===================== tabs ===================== */
@@ -701,24 +748,35 @@ function renderMediaList(){
     return;
   }
   list.innerHTML = media.map(m=>`
-    <div class="media-item" draggable="true" data-mid="${m.id}" ondragstart="onMediaDragStart(event,'${m.id}')" onclick="previewMedia('${m.id}')">
-      <img class="media-thumb" src="${m.thumb}">
-      <div class="media-meta">
+    <div class="media-item" draggable="true" data-mid="${m.id}" ondragstart="onMediaDragStart(event,'${m.id}')">
+      <img class="media-thumb" src="${m.thumb}" onclick="previewMedia('${m.id}')" style="cursor:pointer">
+      <div class="media-meta" style="flex:1;min-width:0" onclick="previewMedia('${m.id}')">
         <div class="media-name">${escapeHtml(m.name)}</div>
         <div class="media-dur mono">${fmtTime(m.duration)}</div>
-        <span class="media-tag">${currentLang==='id'?'seret ke timeline':'drag to timeline'}</span>
+        <span class="media-tag">${currentLang==='id'?'seret, atau klik +':'drag, or click +'}</span>
       </div>
+      <button class="media-add-btn" title="${currentLang==='id'?'Tambah ke timeline':'Add to timeline'}" onclick="event.stopPropagation();addMediaToTimeline('${m.id}')">+</button>
     </div>
   `).join('');
+}
+function addMediaToTimeline(mid){
+  const m = media.find(x=>x.id===mid);
+  if(!m) return;
+  timeline.push({id:'t'+(uidCounter++), mediaId:m.id, name:m.name, url:m.url,
+    duration:m.duration, trimIn:0, trimOut:m.duration});
+  renderTimeline();
+  showToast(currentLang==='id' ? `${m.name} ditambahkan ke timeline` : `${m.name} added to timeline`);
 }
 
 function previewMedia(mid){
   const m = media.find(x=>x.id===mid);
   if(!m) return;
+  seq.mode = 'idle'; seq.playing = false;
   const v = document.getElementById('previewVideo');
   v.src = m.url;
   v.style.display = 'block';
   document.getElementById('emptyPreview').style.display = 'none';
+  hideSubtitleOverlay();
   v.play().catch(()=>{});
 }
 
@@ -760,16 +818,44 @@ function renderTimeline(){
   trackEl.innerHTML = timeline.map((c,idx)=>{
     const dur = Math.max(0.2, c.trimOut - c.trimIn);
     const w = Math.max(50, dur*pxPerSec);
+    const marks = (c.highlights||[]).map(h=>{
+      const hs = Math.max(c.trimIn, h.start) - c.trimIn;
+      const he = Math.min(c.trimOut, h.end) - c.trimIn;
+      if(he<=hs) return '';
+      return `<div class="highlight-mark" style="left:${hs*pxPerSec}px;width:${(he-hs)*pxPerSec}px"></div>`;
+    }).join('');
     return `
     <div class="tl-clip" style="width:${w}px" draggable="true" data-idx="${idx}"
       ondragstart="onClipDragStart(event,${idx})" ondragover="onClipDragOver(event,${idx})"
-      ondrop="onClipDrop(event,${idx})" ondragend="onClipDragEnd(event)">
+      ondrop="onClipDrop(event,${idx})" ondragend="onClipDragEnd(event)"
+      onclick="onTimelineClipClick(event, ${idx})">
+      ${marks}
       <div class="trim-handle left" onmousedown="startTrim(event, ${idx}, 'left')"></div>
       <div class="trim-handle right" onmousedown="startTrim(event, ${idx}, 'right')"></div>
       <div class="tl-clip-dur mono">${fmtTime(dur)}</div>
       <div class="tl-clip-label">${idx+1}. ${escapeHtml(c.name)}</div>
     </div>`;
-  }).join('');
+  }).join('') + `<div class="tl-playhead" id="tlPlayhead"></div>`;
+  updatePlayheadPosition(seq.elapsed || 0);
+}
+function tlClipDurations(){ return timeline.map(c=>Math.max(0.2, c.trimOut-c.trimIn)); }
+function tlTotalDuration(){ return tlClipDurations().reduce((a,b)=>a+b, 0); }
+function updatePlayheadPosition(elapsed){
+  const ph = document.getElementById('tlPlayhead');
+  if(!ph) return;
+  const pxPerSec = 26;
+  let x = 0;
+  for(const d of tlClipDurations()){
+    if(elapsed <= d){ x += elapsed*pxPerSec; break; }
+    elapsed -= d; x += d*pxPerSec + 3; // +3 for the gap between clips
+  }
+  ph.style.transform = `translateX(${x}px)`;
+}
+function onTimelineClipClick(e, idx){
+  if(e.target.classList.contains('trim-handle')) return;
+  let elapsed = 0;
+  for(let i=0;i<idx;i++) elapsed += Math.max(0.2, timeline[i].trimOut-timeline[i].trimIn);
+  seekSequence(elapsed);
 }
 
 let dragClipIdx = null;
@@ -813,14 +899,83 @@ function onTrimUp(){
 }
 function clearTimeline(){ timeline = []; renderTimeline(); }
 
-/* ===================== transport ===================== */
+/* ===================== transport: real sequence playback ===================== */
+const previewVideoEl = document.getElementById('previewVideo');
+let seq = { playing:false, index:0, elapsed:0, mode:'idle' }; // mode: 'idle' | 'single' | 'sequence'
+
 function playPause(){
-  const v = document.getElementById('previewVideo');
-  if(v.paused) v.play().catch(()=>{}); else v.pause();
+  if(timeline.length){
+    if(seq.mode==='sequence' && seq.playing){ pauseSequence(); }
+    else { playSequence(); }
+  } else if(previewVideoEl.src){
+    if(previewVideoEl.paused) previewVideoEl.play().catch(()=>{}); else previewVideoEl.pause();
+  }
 }
-document.getElementById('previewVideo').addEventListener('timeupdate', (e)=>{
-  const v = e.target;
-  document.getElementById('tlTime').textContent = fmtTime(v.currentTime)+' / '+fmtTime(v.duration||0);
+function elapsedBeforeIndex(idx){
+  let e = 0;
+  for(let i=0;i<idx;i++) e += Math.max(0.2, timeline[i].trimOut-timeline[i].trimIn);
+  return e;
+}
+function playSequence(){
+  if(!timeline.length) return;
+  seq.mode = 'sequence'; seq.playing = true;
+  loadSeqClip(seq.index || 0, true);
+}
+function pauseSequence(){
+  seq.playing = false;
+  previewVideoEl.pause();
+}
+function loadSeqClip(idx, autoplay, seekWithin){
+  if(idx>=timeline.length){ seq.playing=false; seq.mode='idle'; return; }
+  seq.index = idx;
+  const c = timeline[idx];
+  document.getElementById('emptyPreview').style.display = 'none';
+  previewVideoEl.style.display = 'block';
+  const startAt = c.trimIn + (seekWithin||0);
+  const onReady = ()=>{
+    previewVideoEl.currentTime = startAt;
+    previewVideoEl.removeEventListener('loadedmetadata', onReady);
+    if(autoplay) previewVideoEl.play().catch(()=>{});
+  };
+  if(previewVideoEl.src !== c.url){
+    previewVideoEl.src = c.url;
+    previewVideoEl.addEventListener('loadedmetadata', onReady);
+  } else {
+    onReady();
+  }
+}
+function seekSequence(elapsedTarget){
+  const durs = tlClipDurations();
+  let acc = 0;
+  for(let i=0;i<durs.length;i++){
+    if(elapsedTarget <= acc + durs[i] || i===durs.length-1){
+      const within = Math.max(0, elapsedTarget - acc);
+      const wasPlaying = seq.playing;
+      seq.mode = 'sequence';
+      loadSeqClip(i, wasPlaying, within);
+      return;
+    }
+    acc += durs[i];
+  }
+}
+previewVideoEl.addEventListener('timeupdate', ()=>{
+  if(seq.mode==='sequence' && timeline[seq.index]){
+    const c = timeline[seq.index];
+    if(previewVideoEl.currentTime >= c.trimOut - 0.05){
+      if(seq.index < timeline.length-1){ loadSeqClip(seq.index+1, seq.playing); }
+      else { seq.playing = false; }
+    }
+    const elapsed = elapsedBeforeIndex(seq.index) + Math.max(0, previewVideoEl.currentTime - c.trimIn);
+    seq.elapsed = elapsed;
+    document.getElementById('tlTime').textContent = fmtTime(elapsed)+' / '+fmtTime(tlTotalDuration());
+    updatePlayheadPosition(elapsed);
+    updateSubtitleOverlay(c, previewVideoEl.currentTime);
+  } else {
+    document.getElementById('tlTime').textContent = fmtTime(previewVideoEl.currentTime)+' / '+fmtTime(previewVideoEl.duration||0);
+  }
+});
+previewVideoEl.addEventListener('ended', ()=>{
+  if(seq.mode==='sequence' && seq.index < timeline.length-1){ loadSeqClip(seq.index+1, true); }
 });
 
 /* ===================== toast ===================== */
@@ -1188,6 +1343,38 @@ function playClipToCanvas(clip, ctx, canvas, audioCtx, dest){
 switchTab('media');
 renderMediaList();
 renderTimeline();
+</script>
+<script type="module">
+  // Real, in-browser speech-to-text (Whisper-tiny via transformers.js / WASM).
+  // No backend, no API key — the model itself (~40-75MB) downloads once and
+  // is cached by the browser. This is genuinely experimental: quality is
+  // limited (tiny model), first run can take a while depending on device/
+  // connection, and word-level timing below is an approximation (Whisper
+  // gives per-phrase timestamps; we evenly split each phrase's words across
+  // its time span rather than getting true forced-alignment per word).
+  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+  env.allowLocalModels = false;
+  let transcriberPromise = null;
+  function getTranscriber(onProgress){
+    if(!transcriberPromise){
+      transcriberPromise = pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+        quantized: true,
+        progress_callback: onProgress
+      });
+    }
+    return transcriberPromise;
+  }
+  window.__whisperTranscribe = async function(float32Audio, langWord, onProgress){
+    const transcriber = await getTranscriber(onProgress);
+    const output = await transcriber(float32Audio, {
+      return_timestamps: true,
+      language: langWord,
+      task: 'transcribe',
+      chunk_length_s: 30,
+      stride_length_s: 5
+    });
+    return output;
+  };
 </script>
 </body>
 </html>
