@@ -88,7 +88,8 @@ async function workerFetch(path, init = {}) {
   let data;
   try { data = JSON.parse(text); } catch { data = { error: text }; }
   if (!response.ok) {
-    const error = new Error(data?.error || `Render worker request failed (${response.status})`);
+    const detail = data?.error || data?.message || text || 'No error body returned by worker';
+    const error = new Error(`Render worker request failed (${response.status}): ${detail}`);
     error.status = response.status;
     throw error;
   }
