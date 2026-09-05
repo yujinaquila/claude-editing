@@ -1,743 +1,1193 @@
+<!--
+  ClipForge AI — Vercel-ready, local-storage edition, with "Sign in with
+  Google" via Supabase Auth (project: attrgssmemtipoingkpe).
+  This is a plain static site (no build step) — Vercel serves this index.html
+  as-is. Imported clips + timeline still stay local per-account in each
+  visitor's browser via IndexedDB; only the LOGIN goes through Supabase.
+
+  Supabase URL + anon/publishable key below are safe to hardcode — they're
+  designed to be public in client-side code (protected by Row Level Security
+  server-side), unlike a service-role key or a Google Client Secret.
+
+  ── One-time setup so the Google button actually works ──
+  1. In Supabase Dashboard → Authentication → Sign In / Providers → Google:
+     enable it, and paste your Google OAuth Client ID + Client Secret
+     (create these at console.cloud.google.com/apis/credentials, type
+     "Web application").
+  2. Back in Google Cloud Console, add this to "Authorized redirect URIs"
+     on that same OAuth Client (NOT "JavaScript origins" — Supabase does a
+     server-side redirect):
+       https://attrgssmemtipoingkpe.supabase.co/auth/v1/callback
+  3. In Supabase Dashboard → Authentication → URL Configuration, set:
+       Site URL:            https://claude-editing.vercel.app
+       Additional Redirect URLs: http://localhost:3000 (for local dev)
+  See README.md for the full walkthrough.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Premiere AI Video Editor</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    /* Aspect Ratio Frames */
-    .aspect-portrait { aspect-ratio: 9 / 16; height: 100%; max-width: 100%; }
-    .aspect-landscape { aspect-ratio: 16 / 9; width: 100%; max-height: 100%; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClipForge AI — Marketing Video Editor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-    /* Dynamic Subtitle Style Presets */
-    .sub-style-tiktok .sub-word-active { background-color: #facc15; color: #000000; font-weight: 800; transform: scale(1.08); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .sub-style-tiktok .sub-word-inactive { background-color: rgba(0, 0, 0, 0.75); color: #ffffff; font-weight: 600; }
+  :root{
+    --bg:#0e0e11;
+    --panel:#17171b;
+    --panel-2:#1d1d22;
+    --border:#2a2a30;
+    --text:#eceef1;
+    --muted:#8b8b95;
+    --muted-2:#5f5f68;
+    --ai:#7c5cff;
+    --ai-dim:#3a2e78;
+    --render:#ff5470;
+    --ok:#34d399;
+    --warn:#f5b83d;
+    --track:#202027;
+    --clip:#2b2b46;
+    --clip-border:#5a4fd6;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Inter',ui-sans-serif,system-ui,sans-serif;overflow:hidden;}
+  ::selection{background:var(--ai);color:#fff;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+  .hidden{display:none !important;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#333339;border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
 
-    .sub-style-netflix .sub-word-active { background-color: #ffffff; color: #000000; font-weight: 800; }
-    .sub-style-netflix .sub-word-inactive { background-color: rgba(20, 20, 20, 0.85); color: #cccccc; font-weight: 500; }
+  /* ---------- LOGIN ---------- */
+  #loginScreen{
+    position:fixed;inset:0;background:
+      radial-gradient(circle at 20% 15%, #1c1730 0%, transparent 45%),
+      radial-gradient(circle at 85% 80%, #1a1420 0%, transparent 45%),
+      var(--bg);
+    display:flex;align-items:center;justify-content:center;z-index:1000;
+  }
+  .login-card{width:380px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;padding:32px;box-shadow:0 30px 60px rgba(0,0,0,.5);}
+  .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+  .login-mark{width:30px;height:30px;border-radius:8px;
+    background:linear-gradient(135deg,var(--ai),#c084fc);flex:none;}
+  .login-title{font-weight:700;font-size:16px;letter-spacing:.2px;}
+  .login-sub{color:var(--muted);font-size:13px;margin:0 0 22px;line-height:1.5;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .field input{width:100%;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:8px;padding:10px 12px;color:var(--text);font-size:13.5px;outline:none;}
+  .field input:focus{border-color:var(--ai);}
+  .btn-primary{width:100%;background:var(--ai);color:#fff;border:none;border-radius:8px;
+    padding:11px;font-weight:600;font-size:13.5px;margin-top:6px;transition:background .15s;}
+  .btn-primary:hover{background:#6b4be0;}
+  .login-note{margin-top:16px;font-size:11.5px;color:var(--muted-2);line-height:1.5;
+    border-top:1px solid var(--border);padding-top:14px;}
+  .g-signin-wrap{display:flex;justify-content:center;margin-bottom:6px;min-height:44px;}
+  .g-signin-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+    background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:22px;padding:10px 14px;
+    font-weight:600;font-size:13.5px;margin-bottom:6px;}
+  .g-signin-btn:hover{background:#f7f7f7;}
+  .g-signin-fallback{font-size:11px;color:var(--muted-2);text-align:center;margin:2px 0 4px;}
+  .divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--muted-2);font-size:11px;}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border);}
+  .g-config-warn{background:#3a2a12;border:1px solid #5a4118;color:#e0b26b;font-size:11px;
+    border-radius:8px;padding:9px 10px;margin-bottom:14px;line-height:1.5;}
 
-    .sub-style-neon .sub-word-active { background-color: #00f0ff; color: #000000; font-weight: 800; box-shadow: 0 0 12px #00f0ff; }
-    .sub-style-neon .sub-word-inactive { background-color: rgba(10, 10, 20, 0.9); color: #00f0ff; border: 1px solid #00f0ff; }
+  /* ---------- APP SHELL ---------- */
+  #app{display:none;height:100vh;grid-template-rows:48px 1fr 230px;grid-template-columns:280px 1fr 320px;
+    grid-template-areas:"top top top" "left center right" "bottom bottom bottom";}
+  #app.active{display:grid;}
 
-    .sub-style-minimal .sub-word-active { background-color: #e5e5e5; color: #171717; font-weight: 700; }
-    .sub-style-minimal .sub-word-inactive { background-color: rgba(23, 23, 23, 0.9); color: #a3a3a3; }
+  /* topbar */
+  #topbar{grid-area:top;display:flex;align-items:center;justify-content:space-between;
+    padding:0 14px;border-bottom:1px solid var(--border);background:var(--panel);}
+  .tb-left{display:flex;align-items:center;gap:10px;}
+  .tb-logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--ai),#c084fc);}
+  .tb-name{font-weight:700;font-size:14px;}
+  .tb-project{color:var(--muted);font-size:12.5px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border);}
+  .tb-right{display:flex;align-items:center;gap:10px;}
+  .lang-switch{display:flex;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+  .lang-switch button{background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:600;
+    padding:6px 10px;transition:all .15s;}
+  .lang-switch button.active{background:var(--ai);color:#fff;}
+  .avatar{width:26px;height:26px;border-radius:50%;background:var(--ai-dim);color:#c8bcff;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;overflow:hidden;}
+  .avatar img{width:100%;height:100%;object-fit:cover;}
+  .btn-render{display:flex;align-items:center;gap:6px;background:var(--render);color:#fff;border:none;
+    border-radius:7px;padding:7px 14px;font-weight:600;font-size:12.5px;}
+  .btn-render:hover{background:#e64562;}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:7px;
+    padding:7px 12px;font-size:12.5px;}
+  .btn-ghost:hover{border-color:#45454d;}
 
-    .sub-word-box {
-      display: inline-block;
-      padding: 2px 6px;
-      margin: 2px;
-      border-radius: 4px;
-      transition: all 0.1s ease;
-    }
+  /* left panel */
+  #left{grid-area:left;border-right:1px solid var(--border);background:var(--panel);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .tabs{display:flex;border-bottom:1px solid var(--border);flex:none;}
+  .tab{flex:1;text-align:center;padding:10px 0;font-size:12px;color:var(--muted);
+    border-bottom:2px solid transparent;font-weight:600;}
+  .tab.active{color:var(--text);border-color:var(--ai);}
+  .tab-body{flex:1;overflow-y:auto;padding:12px;}
+  .import-btn{width:100%;border:1.5px dashed #3a3a42;border-radius:9px;background:transparent;
+    color:var(--muted);padding:16px 10px;font-size:12.5px;text-align:center;margin-bottom:12px;}
+  .import-btn:hover{border-color:var(--ai);color:var(--text);}
+  .media-item{display:flex;gap:8px;padding:6px;border-radius:8px;margin-bottom:6px;cursor:grab;
+    border:1px solid transparent;}
+  .media-item:hover{background:var(--panel-2);border-color:var(--border);}
+  .media-thumb{width:56px;height:32px;border-radius:5px;object-fit:cover;background:#000;flex:none;}
+  .media-meta{overflow:hidden;}
+  .media-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .media-dur{font-size:10.5px;color:var(--muted-2);}
+  .media-tag{display:inline-block;font-size:9.5px;font-weight:700;color:var(--ai);background:var(--ai-dim);
+    padding:1px 5px;border-radius:4px;margin-top:2px;}
 
-    /* Highlight Tag */
-    .highlight-tag {
-      background-color: #8b5cf6;
-      color: #ffffff;
-      font-size: 9px;
-      font-weight: bold;
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
+  .section-label{font-size:11px;text-transform:none;color:var(--muted);font-weight:600;margin:14px 0 8px;
+    display:flex;align-items:center;justify-content:space-between;}
 
-    /* Transition Animations for Preview Monitor */
-    .transition-cut-flash {
-      animation: cutFlash 0.25s ease-out;
-    }
-    @keyframes cutFlash {
-      0% { filter: brightness(2) contrast(1.2); opacity: 0.5; }
-      100% { filter: brightness(1) contrast(1); opacity: 1; }
-    }
-  </style>
+  /* AI prompt panel */
+  .ai-box{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;}
+  select.tpl{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+    color:var(--text);padding:8px;font-size:12px;margin-bottom:8px;}
+  textarea.prompt{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+    color:var(--text);padding:9px;font-size:12.5px;resize:vertical;min-height:70px;line-height:1.5;}
+  .ai-run{width:100%;background:var(--ai);border:none;color:#fff;border-radius:7px;padding:9px;
+    font-weight:600;font-size:12.5px;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .ai-run:hover{background:#6b4be0;}
+  .ai-run:disabled{opacity:.55;cursor:default;}
+  .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .feature-btn{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
+    padding:10px 8px;text-align:left;color:var(--text);}
+  .feature-btn:hover{border-color:var(--ai);}
+  .feature-btn .fb-title{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;}
+  .feature-btn .fb-sub{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.4;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--ai);flex:none;}
+
+  /* center */
+  #center{grid-area:center;display:flex;flex-direction:column;background:#000;overflow:hidden;}
+  #previewWrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;background:#000;}
+  #previewVideo{max-width:100%;max-height:100%;background:#000;}
+  #emptyPreview{color:var(--muted-2);font-size:13px;text-align:center;}
+  #emptyPreview .em-mark{font-size:34px;margin-bottom:8px;}
+  #canvasRender{display:none;}
+  .transport{flex:none;display:flex;align-items:center;gap:10px;padding:8px 14px;
+    background:var(--panel);border-top:1px solid var(--border);}
+  .tr-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+  .tr-time{font-size:11.5px;color:var(--muted);}
+
+  /* right panel */
+  #right{grid-area:right;border-left:1px solid var(--border);background:var(--panel);
+    overflow-y:auto;padding:12px;}
+  .panel-h{font-size:12.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .result-card{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
+    padding:11px;margin-bottom:10px;font-size:12px;line-height:1.55;}
+  .result-card h4{margin:0 0 6px;font-size:12px;color:var(--ai);}
+  .result-card .badge{font-size:9.5px;font-weight:700;color:var(--warn);background:#3a3120;
+    padding:1px 5px;border-radius:4px;margin-left:6px;}
+  .apply-btn{background:transparent;border:1px solid var(--ai);color:var(--ai);border-radius:6px;
+    padding:5px 9px;font-size:11px;font-weight:600;margin-top:8px;}
+  .apply-btn:hover{background:var(--ai-dim);}
+  .empty-right{color:var(--muted-2);font-size:12px;text-align:center;margin-top:40px;line-height:1.6;}
+
+  /* bottom timeline */
+  #bottom{grid-area:bottom;border-top:1px solid var(--border);background:var(--panel);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .tl-head{flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:7px 14px;border-bottom:1px solid var(--border);}
+  .tl-head-left{display:flex;align-items:center;gap:10px;}
+  .tl-title{font-size:12px;font-weight:700;}
+  .tl-hint{font-size:11px;color:var(--muted-2);}
+  #tlScroll{flex:1;overflow-x:auto;overflow-y:hidden;padding:14px;}
+  .tl-track-label{font-size:10.5px;color:var(--muted);margin-bottom:6px;}
+  .tl-track{display:flex;gap:3px;height:64px;min-width:100%;align-items:stretch;}
+  .tl-clip{position:relative;background:linear-gradient(180deg,var(--clip),#22223a);
+    border:1.5px solid var(--clip-border);border-radius:7px;flex:none;height:100%;
+    display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;cursor:grab;}
+  .tl-clip.dragging{opacity:.4;}
+  .tl-clip.drop-target{outline:2px solid var(--ai);}
+  .tl-clip-label{font-size:10px;font-weight:600;padding:3px 6px;background:rgba(0,0,0,.45);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tl-clip-dur{position:absolute;top:3px;right:5px;font-size:9px;color:#c8c8ff;}
+  .trim-handle{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;background:rgba(124,92,255,.0);}
+  .trim-handle.left{left:0;}
+  .trim-handle.right{right:0;}
+  .trim-handle:hover{background:rgba(124,92,255,.5);}
+  .tl-empty{color:var(--muted-2);font-size:12px;padding:20px 0;}
+  .silence-mark{position:absolute;bottom:0;top:0;background:repeating-linear-gradient(45deg,rgba(255,84,112,.25),rgba(255,84,112,.25) 3px,transparent 3px,transparent 6px);}
+
+  /* toast / loading */
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-2);
+    border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;
+    font-size:12.5px;z-index:2000;display:none;box-shadow:0 10px 30px rgba(0,0,0,.5);}
+  .spin{width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;display:inline-block;animation:spin .7s linear infinite;margin-right:2px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  #renderModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;
+    justify-content:center;z-index:1500;}
+  .render-card{width:360px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;}
+  .progress-bar{height:8px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin:14px 0 8px;}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--ai),var(--render));transition:width .2s;}
+</style>
 </head>
-<body class="bg-[#1e1e1e] text-gray-200 font-sans select-none h-screen flex flex-col overflow-hidden">
+<body>
 
-  <!-- Top Application Bar -->
-  <header class="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-[#333] relative z-50">
-    <div class="flex items-center space-x-4">
-      <span class="text-purple-500 font-bold text-lg tracking-wider">PREMIERE AI</span>
-      <span id="aiMemoryBadge" class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/60 px-2.5 py-0.5 rounded-full font-mono">
-        Engine Initializing...
-      </span>
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-mark"></div>
+      <div class="login-title" data-i18n="appName">ClipForge AI</div>
     </div>
-    <div class="flex items-center space-x-2">
-      <button id="exportBtn" class="flex items-center space-x-1 text-xs bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-gray-200 px-2.5 py-1.5 rounded transition">
-        <i data-lucide="download" class="w-3.5 h-3.5"></i>
-        <span>Export Render</span>
-      </button>
-      
-      <button id="analyzeBtn" class="flex items-center space-x-1.5 text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1.5 rounded transition shadow-lg">
-        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-        <span>1. Safe Fast Transcribe</span>
-      </button>
-
-      <button id="autoCutBtn" disabled class="flex items-center space-x-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 text-white px-3 py-1.5 rounded transition shadow-lg">
-        <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
-        <span>2. Apply Silence Cut</span>
-      </button>
-
-      <button id="highlightCutBtn" disabled class="flex items-center space-x-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:opacity-50 text-white px-3 py-1.5 rounded transition shadow-lg">
-        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-        <span>3. Auto Highlight Cut</span>
-      </button>
+    <p class="login-sub" data-i18n="loginSub">Sign in to start editing your marketing videos with AI. Each account keeps its own projects and media.</p>
+    <div id="gConfigWarn" class="g-config-warn hidden" data-i18n="gConfigWarn">Google Sign-In isn't fully set up yet — enable the Google provider in your Supabase project's Authentication settings. Use the form below for now.</div>
+    <button class="g-signin-btn" id="gSignInBtn" onclick="signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.5 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.9-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 6.5 29.5 4.5 24 4.5 15.9 4.5 8.9 9.1 6.3 14.7z"/><path fill="#4CAF50" d="M24 44.5c5.3 0 10.2-2 13.8-5.4l-6.4-5.3C29.3 35.6 26.8 36.5 24 36.5c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9 39.9 15.9 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.4 5.3C40.9 36.4 44.5 30.7 44.5 24c0-1.2-.1-2.4-.9-3.5z"/></svg>
+      <span data-i18n="gSignInLabel">Sign in with Google</span>
+    </button>
+    <div class="divider" data-i18n="orDivider">or continue without Google</div>
+    <div class="field">
+      <label data-i18n="labelName">Your name</label>
+      <input id="loginName" type="text" placeholder="e.g. Sam">
     </div>
-  </header>
+    <div class="field">
+      <label data-i18n="labelEmail">Email</label>
+      <input id="loginEmail" type="email" placeholder="you@example.com">
+    </div>
+    <button class="btn-primary" id="loginBtn" data-i18n="signIn">Sign in</button>
+    <div class="login-note" data-i18n="loginNote">Demo authentication only — not Anthropic's actual account login system. Each email gets its own local project space, saved in this browser via IndexedDB. Nothing is uploaded to a server.</div>
+  </div>
+</div>
 
-  <!-- Workspace -->
-  <div class="flex flex-1 overflow-hidden">
-    <!-- Left Control Panel -->
-    <div class="w-1/3 border-r border-[#333] bg-[#252525] flex flex-col p-3 space-y-3 overflow-y-auto">
-      
-      <div id="dropZone" class="border-2 border-dashed border-[#444] rounded-lg p-3 text-center hover:border-purple-500 transition cursor-pointer relative bg-[#1e1e1e]">
-        <input type="file" id="videoInput" accept="video/*" class="hidden" />
-        <i data-lucide="upload" class="w-5 h-5 mx-auto mb-1 text-gray-400"></i>
-        <p class="text-xs text-gray-300">Import Video / Drop Media Here</p>
+<!-- ============ APP ============ -->
+<div id="app">
+
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <div class="tb-left">
+      <div class="tb-logo"></div>
+      <div class="tb-name" data-i18n="appName">ClipForge AI</div>
+      <div class="tb-project" data-i18n="untitled">Untitled marketing project</div>
+    </div>
+    <div class="tb-right">
+      <div class="lang-switch">
+        <button id="langEN" class="active" onclick="setLang('en')">EN</button>
+        <button id="langID" onclick="setLang('id')">ID</button>
       </div>
+      <button class="btn-ghost" onclick="triggerImport()" data-i18n="importBtn">Import</button>
+      <button class="btn-ghost" onclick="clearLocalData()" data-i18n="clearLocalBtn">Clear local data</button>
+      <button class="btn-render" onclick="openRenderModal()">
+        <span>⤓</span><span data-i18n="renderBtn">Render &amp; Export</span>
+      </button>
+      <div class="avatar" id="avatarInit">?</div>
+    </div>
+  </div>
 
-      <div class="flex flex-col space-y-2 bg-[#1e1e1e] p-2.5 rounded border border-[#333]">
-        <label class="text-xs font-semibold text-purple-400 flex items-center justify-between">
-          <span class="flex items-center space-x-1">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            <span>Pipeline Controls</span>
-          </span>
-          <span id="silenceThresholdText" class="text-[10px] text-gray-400 font-mono">Sens: -28dB</span>
-        </label>
-        
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Aspect Ratio:</span>
-          <select id="aspectSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="portrait">Portrait 9:16 (TikTok/Reels)</option>
-            <option value="landscape">Landscape 16:9 (YouTube)</option>
-          </select>
-        </div>
-
-        <!-- Subtitle Style Presets Dropdown Restored -->
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Subtitle Style:</span>
-          <select id="styleSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="sub-style-tiktok">TikTok Yellow</option>
-            <option value="sub-style-netflix">Netflix White</option>
-            <option value="sub-style-neon">Neon Cyberpunk</option>
-            <option value="sub-style-minimal">Minimal Dark</option>
-          </select>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Cut Transition:</span>
-          <select id="transitionSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="flash">Zoom Flash Transition</option>
-            <option value="fade">Cross Fade Transition</option>
-          </select>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-gray-400">Speech Language:</span>
-          <select id="langSelect" class="bg-[#2a2a2a] border border-[#444] text-xs text-gray-200 rounded p-1 focus:outline-none">
-            <option value="english">English (Strict EN)</option>
-            <option value="indonesian">Bahasa Indonesia</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="analysisCard" class="bg-[#1e1e1e] border border-[#333] rounded p-2 hidden">
-        <h4 class="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center space-x-1">
-          <i data-lucide="bar-chart-2" class="w-3 h-3"></i>
-          <span>AI Highlight Analysis Report</span>
-        </h4>
-        <div id="analysisDetails" class="text-[10px] space-y-1 text-gray-300 font-mono"></div>
-      </div>
-
-      <div class="flex-1 bg-[#1e1e1e] border border-[#333] rounded p-2 overflow-y-auto">
-        <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-          <span class="flex items-center space-x-1">
-            <i data-lucide="subtitles" class="w-3 h-3"></i>
-            <span>Parsed Subtitles (Editable)</span>
-          </span>
-        </h4>
-        <div id="subtitlesList" class="space-y-1">
-          <p class="text-[10px] text-gray-500 italic">Run Transcribe to parse captions.</p>
-        </div>
-      </div>
+  <!-- LEFT: media + AI -->
+  <div id="left">
+    <div class="tabs">
+      <div class="tab active" data-tab="media" onclick="switchTab('media')" data-i18n="tabMedia">Media</div>
+      <div class="tab" data-tab="ai" onclick="switchTab('ai')" data-i18n="tabAI">AI Edit</div>
     </div>
 
-    <!-- Center Monitor -->
-    <div class="flex-1 flex flex-col bg-[#141414]">
-      <div class="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
-        
-        <div id="monitorContainer" class="hidden w-full h-full flex items-center justify-center relative">
-          <div id="monitorWrapper" class="aspect-portrait relative flex items-center justify-center overflow-hidden">
-            <video id="mainVideo" class="w-full h-full rounded border border-[#333] object-contain bg-black"></video>
-            
-            <div id="subtitleOverlay" class="sub-style-tiktok absolute bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none px-2 py-1 z-40 w-[90%] flex flex-wrap justify-center items-center gap-1 transition-opacity duration-150 opacity-0"></div>
-          </div>
-        </div>
+    <div class="tab-body" id="tabMediaBody">
+      <button class="import-btn" onclick="triggerImport()">
+        <div data-i18n="dropHint">＋ Import video clips</div>
+      </button>
+      <input type="file" id="fileInput" accept="video/*" multiple class="hidden">
+      <div id="mediaList"></div>
+    </div>
 
-        <div id="emptyMonitor" class="text-center text-gray-600">
-          <i data-lucide="video" class="w-12 h-12 mx-auto mb-2 opacity-30"></i>
-          <p class="text-xs">No media loaded in monitor</p>
-        </div>
-
-        <div id="statusOverlay" class="hidden absolute bottom-6 bg-purple-900/90 text-purple-100 text-xs px-3 py-1.5 rounded backdrop-blur border border-purple-500 z-50 max-w-md text-center shadow-2xl"></div>
-      </div>
-
-      <div class="h-10 bg-[#1e1e1e] border-t border-[#333] flex items-center justify-between px-4">
-        <button id="playBtn" class="p-1 hover:bg-[#333] rounded text-gray-300">
-          <i data-lucide="play" class="w-4 h-4"></i>
+    <div class="tab-body hidden" id="tabAIBody">
+      <div class="section-label" data-i18n="promptLabel">Prompt-based edit</div>
+      <div class="ai-box">
+        <select class="tpl" id="tplSelect" onchange="applyTemplate()">
+          <option value="" data-i18n="tplCustom">Custom prompt…</option>
+          <option value="hook" data-i18n="tplHook">TikTok hook — punchy 3s intro</option>
+          <option value="reel" data-i18n="tplReel">Instagram Reel — fast cuts on the beat</option>
+          <option value="highlights" data-i18n="tplHighlights">Highlight reel from best moments</option>
+          <option value="captions" data-i18n="tplCaptions">Bold caption style suggestions</option>
+          <option value="silence" data-i18n="tplSilence">Tighten pacing — remove dead air</option>
+        </select>
+        <textarea class="prompt" id="promptInput" data-i18n-ph="promptPh"
+          placeholder="Describe the edit you want, e.g. 'Make a 15s TikTok hook from clip 2, punchy captions, upbeat pacing'"></textarea>
+        <button class="ai-run" id="promptRunBtn" onclick="runPromptEdit()">
+          <span data-i18n="generateBtn">Generate with AI</span>
         </button>
-        <span id="timecode" class="text-[11px] font-mono text-gray-400">00:00:00:00</span>
+      </div>
+
+      <div class="section-label" data-i18n="featuresLabel">AI features</div>
+      <div class="feature-grid">
+        <button class="feature-btn" onclick="runAutoTranscript()">
+          <div class="fb-title"><span class="dot"></span><span data-i18n="fTranscript">Auto Transcript</span></div>
+          <div class="fb-sub" data-i18n="fTranscriptSub">Caption-ready script per clip</div>
+        </button>
+        <button class="feature-btn" onclick="runAutoCut()">
+          <div class="fb-title"><span class="dot"></span><span data-i18n="fCut">Auto Cut</span></div>
+          <div class="fb-sub" data-i18n="fCutSub">Detects &amp; trims silent gaps</div>
+        </button>
+        <button class="feature-btn" onclick="runAutoHook()">
+          <div class="fb-title"><span class="dot"></span><span data-i18n="fHook">Auto Hook</span></div>
+          <div class="fb-sub" data-i18n="fHookSub">Finds your strongest opener</div>
+        </button>
+        <button class="feature-btn" onclick="runSceneChoose()">
+          <div class="fb-title"><span class="dot"></span><span data-i18n="fScene">Best Scenes</span></div>
+          <div class="fb-sub" data-i18n="fSceneSub">Ranks scenes across imports</div>
+        </button>
       </div>
     </div>
   </div>
 
-  <canvas id="exportCanvas" class="hidden"></canvas>
-
-  <!-- Bottom Panel -->
-  <div class="h-44 border-t border-[#333] bg-[#181818] flex flex-col">
-    <div class="h-6 bg-[#222] border-b border-[#333] flex items-center justify-between px-3 text-[10px] text-gray-400">
-      <div class="flex items-center space-x-2">
-        <i data-lucide="layers" class="w-3 h-3"></i>
-        <span>TIMELINE TRACKS</span>
+  <!-- CENTER: preview + transport -->
+  <div id="center">
+    <div id="previewWrap">
+      <video id="previewVideo" controls></video>
+      <div id="emptyPreview">
+        <div class="em-mark">▶</div>
+        <div data-i18n="emptyPreview">Import a clip and click it to preview</div>
       </div>
-      <span id="durationDisplay" class="font-mono text-purple-400">Total Duration: 00:00:00</span>
     </div>
-    
-    <div class="flex-1 p-2 space-y-2 overflow-x-auto">
-      <div class="h-9 bg-[#262626] border border-[#3a3a3a] rounded flex items-center px-2 relative">
-        <span class="text-[10px] text-blue-400 font-bold mr-2">V1</span>
-        <div id="videoTrackLabel" class="hidden h-6 bg-blue-900/60 border border-blue-500 rounded flex-1 flex items-center justify-between px-2 text-[10px] text-blue-200">
-          <span id="videoTrackName">Video Track</span>
-          <span id="videoTrackDuration" class="font-mono text-[9px] text-blue-300">00:00</span>
-        </div>
-      </div>
-
-      <div class="h-9 bg-[#262626] border border-[#3a3a3a] rounded flex items-center px-2 relative">
-        <span class="text-[10px] text-green-400 font-bold mr-2">A1</span>
-        <div id="audioTrackLabel" class="hidden h-6 bg-green-900/60 border border-green-500 rounded flex-1 flex items-center justify-between px-2 text-[10px] text-green-200">
-          <span id="audioTrackName">Audio & Subtitle Track</span>
-          <span id="audioTrackDuration" class="font-mono text-[9px] text-green-300">00:00</span>
-        </div>
-      </div>
+    <canvas id="canvasRender" width="1080" height="1920"></canvas>
+    <div class="transport">
+      <button class="tr-btn" onclick="playPause()">⏯</button>
+      <span class="tr-time mono" id="tlTime">00:00 / 00:00</span>
+      <span class="tr-time" style="margin-left:auto;color:var(--muted-2)" id="sequenceInfo">0 clips in sequence</span>
     </div>
   </div>
 
-  <script type="module">
-    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+  <!-- RIGHT: AI results / properties -->
+  <div id="right">
+    <div class="panel-h" data-i18n="resultsTitle">AI Results</div>
+    <div id="resultsBody">
+      <div class="empty-right" data-i18n="resultsEmpty">Run an AI feature or prompt on the left — suggestions, transcripts and hook picks will show up here.</div>
+    </div>
+  </div>
 
-    lucide.createIcons();
+  <!-- BOTTOM: timeline -->
+  <div id="bottom">
+    <div class="tl-head">
+      <div class="tl-head-left">
+        <div class="tl-title" data-i18n="timelineTitle">Sequence</div>
+        <div class="tl-hint" data-i18n="timelineHint">Drag clips to reorder · drag clip edges to trim</div>
+      </div>
+      <button class="btn-ghost" onclick="clearTimeline()" data-i18n="clearBtn">Clear</button>
+    </div>
+    <div id="tlScroll">
+      <div class="tl-track-label" data-i18n="videoTrack">Video track</div>
+      <div class="tl-track" id="track"></div>
+    </div>
+  </div>
+</div>
 
-    let currentFile = null;
-    let currentVideoUrl = null;
-    let generatedSubtitles = [];
-    let activeSpeechSegments = [];
-    let highlightSegments = [];
-    let activeCutTimeline = [];
-    let isAutoCutActive = false;
+<div id="toast"></div>
 
-    let aiMemory = { sessionsCount: 0, sensitivityOffset: -28, preferredStyle: 'sub-style-tiktok' };
-    try {
-      const stored = localStorage.getItem('premiere_ai_memory_v11');
-      if (stored) aiMemory = JSON.parse(stored);
-    } catch (e) {}
+<div id="renderModal">
+  <div class="render-card">
+    <div class="panel-h" data-i18n="renderTitle">Rendering export</div>
+    <div style="font-size:12px;color:var(--muted)" id="renderStatus" data-i18n="renderPrep">Preparing sequence…</div>
+    <div class="progress-bar"><div class="progress-fill" id="renderFill"></div></div>
+    <div style="font-size:11px;color:var(--muted-2)" id="renderNote"></div>
+    <button class="btn-ghost" style="margin-top:16px;width:100%" onclick="closeRenderModal()" id="renderCloseBtn" data-i18n="close">Close</button>
+  </div>
+</div>
 
-    function saveMemoryState() {
-      try {
-        localStorage.setItem('premiere_ai_memory_v11', JSON.stringify(aiMemory));
-      } catch (e) {}
-      updateMemoryBadge();
+<script>
+/* ===================== i18n ===================== */
+const DICT = {
+  en: {
+    appName:"ClipForge AI", loginSub:"Sign in to start editing your marketing videos with AI. Each account keeps its own projects and media.",
+    labelName:"Your name", labelEmail:"Email", signIn:"Sign in",
+    orDivider:"or continue without Google",
+    gSignInLabel:"Sign in with Google",
+    gConfigWarn:"Google Sign-In isn't fully set up yet — enable the Google provider in your Supabase project's Authentication settings. Use the form below for now.",
+    loginNote:"Demo authentication only — not Anthropic's actual account login system. Each email gets its own local project space, saved in this browser via IndexedDB. Nothing is uploaded to a server.",
+    untitled:"Untitled marketing project", importBtn:"Import", renderBtn:"Render & Export",
+    tabMedia:"Media", tabAI:"AI Edit", dropHint:"＋ Import video clips",
+    promptLabel:"Prompt-based edit", tplCustom:"Custom prompt…", tplHook:"TikTok hook — punchy 3s intro",
+    tplReel:"Instagram Reel — fast cuts on the beat", tplHighlights:"Highlight reel from best moments",
+    tplCaptions:"Bold caption style suggestions", tplSilence:"Tighten pacing — remove dead air",
+    promptPh:"Describe the edit you want, e.g. 'Make a 15s TikTok hook from clip 2, punchy captions, upbeat pacing'",
+    generateBtn:"Generate with AI", featuresLabel:"AI features",
+    fTranscript:"Auto Transcript", fTranscriptSub:"Caption-ready script per clip",
+    fCut:"Auto Cut", fCutSub:"Detects & trims silent gaps",
+    fHook:"Auto Hook", fHookSub:"Finds your strongest opener",
+    fScene:"Best Scenes", fSceneSub:"Ranks scenes across imports",
+    emptyPreview:"Import a clip and click it to preview", resultsTitle:"AI Results",
+    resultsEmpty:"Run an AI feature or prompt on the left — suggestions, transcripts and hook picks will show up here.",
+    timelineTitle:"Sequence", timelineHint:"Drag clips to reorder · drag clip edges to trim",
+    clearBtn:"Clear", videoTrack:"Video track", renderTitle:"Rendering export",
+    renderPrep:"Preparing sequence…", close:"Close",
+    emptyMedia:"No clips yet — import to get started.",
+    emptyTimeline:"Timeline is empty — drag a clip here from Media.",
+    clearLocalBtn:"Clear local data",
+    clearConfirm:"Delete all clips and the timeline saved for this account in this browser? This can't be undone.",
+    clearedMsg:"Local data cleared",
+  },
+  id: {
+    appName:"ClipForge AI", loginSub:"Masuk untuk mulai mengedit video marketing kamu dengan AI. Setiap akun punya proyek dan media sendiri.",
+    labelName:"Nama kamu", labelEmail:"Email", signIn:"Masuk",
+    orDivider:"atau lanjutkan tanpa Google",
+    gSignInLabel:"Masuk dengan Google",
+    gConfigWarn:"Google Sign-In belum sepenuhnya siap — aktifkan provider Google di pengaturan Authentication proyek Supabase kamu. Gunakan formulir di bawah untuk sementara.",
+    loginNote:"Hanya autentikasi demo — bukan sistem login akun resmi Anthropic. Setiap email punya ruang proyek lokal sendiri, disimpan di browser ini lewat IndexedDB. Tidak ada yang diunggah ke server.",
+    untitled:"Proyek marketing tanpa judul", importBtn:"Impor", renderBtn:"Render & Ekspor",
+    tabMedia:"Media", tabAI:"Edit AI", dropHint:"＋ Impor klip video",
+    promptLabel:"Edit berbasis prompt", tplCustom:"Prompt kustom…", tplHook:"Hook TikTok — intro 3 detik yang kuat",
+    tplReel:"Reels Instagram — potongan cepat sesuai beat", tplHighlights:"Highlight dari momen terbaik",
+    tplCaptions:"Saran gaya caption yang tegas", tplSilence:"Rapikan tempo — hapus jeda sunyi",
+    promptPh:"Jelaskan editan yang kamu mau, mis. 'Buat hook TikTok 15 detik dari klip 2, caption tegas, tempo upbeat'",
+    generateBtn:"Buat dengan AI", featuresLabel:"Fitur AI",
+    fTranscript:"Transkrip Otomatis", fTranscriptSub:"Naskah siap-caption per klip",
+    fCut:"Potong Otomatis", fCutSub:"Mendeteksi & memotong jeda sunyi",
+    fHook:"Hook Otomatis", fHookSub:"Menemukan pembuka paling kuat",
+    fScene:"Adegan Terbaik", fSceneSub:"Meranking adegan dari semua klip",
+    emptyPreview:"Impor klip lalu klik untuk pratinjau", resultsTitle:"Hasil AI",
+    resultsEmpty:"Jalankan fitur AI atau prompt di kiri — saran, transkrip, dan pilihan hook akan muncul di sini.",
+    timelineTitle:"Sekuens", timelineHint:"Seret klip untuk mengurutkan · seret tepi klip untuk memangkas",
+    clearBtn:"Hapus", videoTrack:"Trek video", renderTitle:"Sedang me-render",
+    renderPrep:"Menyiapkan sekuens…", close:"Tutup",
+    emptyMedia:"Belum ada klip — impor untuk mulai.",
+    emptyTimeline:"Timeline masih kosong — seret klip dari Media ke sini.",
+    clearLocalBtn:"Hapus data lokal",
+    clearConfirm:"Hapus semua klip dan timeline yang tersimpan untuk akun ini di browser ini? Tindakan ini tidak bisa dibatalkan.",
+    clearedMsg:"Data lokal dihapus",
+  }
+};
+let currentLang = 'en';
+function setLang(l){
+  currentLang = l;
+  document.getElementById('langEN').classList.toggle('active', l==='en');
+  document.getElementById('langID').classList.toggle('active', l==='id');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k = el.getAttribute('data-i18n');
+    if(DICT[l][k]) el.textContent = DICT[l][k];
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-ph');
+    if(DICT[l][k]) el.setAttribute('placeholder', DICT[l][k]);
+  });
+  renderMediaList(); renderTimeline();
+}
+function t(key){ return (DICT[currentLang] && DICT[currentLang][key]) || key; }
+
+/* ===================== state ===================== */
+let user = null;
+let media = [];      // {id,name,url,file,duration,thumb}
+let timeline = [];   // {id, mediaId, name, url, duration, trimIn, trimOut}
+let uidCounter = 1;
+let activeVideoEl = document.getElementById('previewVideo');
+let db = null;        // per-user IndexedDB handle
+
+/* ===================== IndexedDB (per logged-in account, local only) ===================== */
+function openUserDB(dbName){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(dbName, 1);
+    req.onupgradeneeded = (e)=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('media')) d.createObjectStore('media', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('meta'))  d.createObjectStore('meta', {keyPath:'key'});
+    };
+    req.onsuccess = (e)=>resolve(e.target.result);
+    req.onerror = (e)=>reject(e.target.error);
+  });
+}
+function idbPut(store, obj){
+  return new Promise((resolve, reject)=>{
+    if(!db) return resolve(null);
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(obj);
+    tx.oncomplete = ()=>resolve(true);
+    tx.onerror = (e)=>reject(e.target.error);
+  });
+}
+function idbDelete(store, key){
+  return new Promise((resolve, reject)=>{
+    if(!db) return resolve(null);
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = ()=>resolve(true);
+    tx.onerror = (e)=>reject(e.target.error);
+  });
+}
+function idbGetAll(store){
+  return new Promise((resolve, reject)=>{
+    if(!db) return resolve([]);
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = ()=>resolve(req.result || []);
+    req.onerror = (e)=>reject(e.target.error);
+  });
+}
+function idbGet(store, key){
+  return new Promise((resolve, reject)=>{
+    if(!db) return resolve(null);
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = ()=>resolve(req.result || null);
+    req.onerror = (e)=>reject(e.target.error);
+  });
+}
+let persistTimer = null;
+function persistTimeline(){
+  if(!db) return;
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(()=>{
+    const slim = timeline.map(c=>({id:c.id, mediaId:c.mediaId, name:c.name, duration:c.duration, trimIn:c.trimIn, trimOut:c.trimOut}));
+    idbPut('meta', {key:'timeline', value: JSON.stringify(slim)}).catch(()=>{});
+  }, 300);
+}
+async function loadFromStorage(){
+  if(!db) return;
+  try{
+    const mediaRecords = await idbGetAll('media');
+    media = mediaRecords.map(r=>({
+      id:r.id, name:r.name, duration:r.duration, thumb:r.thumb,
+      url: URL.createObjectURL(r.blob), file:r.blob
+    }));
+    const maxId = media.reduce((m,x)=>Math.max(m, parseInt((x.id||'m0').slice(1))||0), 0);
+    uidCounter = Math.max(uidCounter, maxId+1);
+    renderMediaList();
+
+    const rec = await idbGet('meta', 'timeline');
+    if(rec && rec.value){
+      const arr = JSON.parse(rec.value);
+      timeline = arr.map(t=>{
+        const m = media.find(x=>x.id===t.mediaId);
+        if(!m) return null;
+        return {id:t.id, mediaId:t.mediaId, name:t.name, url:m.url, duration:t.duration, trimIn:t.trimIn, trimOut:t.trimOut};
+      }).filter(Boolean);
     }
+    renderTimeline();
+    if(media.length) showToast(currentLang==='id' ? `Memuat ${media.length} klip tersimpan` : `Loaded ${media.length} saved clip(s)`);
+  }catch(err){
+    console.error('Local load failed', err);
+  }
+}
+async function clearLocalData(){
+  if(!confirm(t('clearConfirm'))) return;
+  media.forEach(m=>{ try{ idbDelete('media', m.id); }catch(e){} });
+  media = []; timeline = [];
+  await idbPut('meta', {key:'timeline', value: JSON.stringify([])});
+  renderMediaList(); renderTimeline();
+  showToast(t('clearedMsg'));
+}
 
-    function updateMemoryBadge() {
-      const hasWebGPU = !!navigator.gpu;
-      const deviceLabel = hasWebGPU ? 'WebGPU Accelerated' : 'Safe Sliced WASM';
-      document.getElementById('aiMemoryBadge').textContent = `Engine: ${deviceLabel} | ${aiMemory.sessionsCount} Runs`;
-      document.getElementById('silenceThresholdText').textContent = `Sens: ${aiMemory.sensitivityOffset}dB`;
-    }
-    updateMemoryBadge();
+/* ===================== login (Supabase Auth + Google OAuth) ===================== */
+const SUPABASE_URL = "https://attrgssmemtipoingkpe.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_zRqpbpSxI3JDYAv4wnqajA_RJfLNcIX";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const dropZone = document.getElementById('dropZone');
-    const videoInput = document.getElementById('videoInput');
-    const mainVideo = document.getElementById('mainVideo');
-    const monitorContainer = document.getElementById('monitorContainer');
-    const monitorWrapper = document.getElementById('monitorWrapper');
-    const emptyMonitor = document.getElementById('emptyMonitor');
-    const playBtn = document.getElementById('playBtn');
-    const timecode = document.getElementById('timecode');
-    const statusOverlay = document.getElementById('statusOverlay');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const autoCutBtn = document.getElementById('autoCutBtn');
-    const highlightCutBtn = document.getElementById('highlightCutBtn');
-    const exportBtn = document.getElementById('exportBtn');
-    const subtitlesList = document.getElementById('subtitlesList');
-    const videoTrackLabel = document.getElementById('videoTrackLabel');
-    const audioTrackLabel = document.getElementById('audioTrackLabel');
-    const videoTrackName = document.getElementById('videoTrackName');
-    const audioTrackName = document.getElementById('audioTrackName');
-    const videoTrackDuration = document.getElementById('videoTrackDuration');
-    const audioTrackDuration = document.getElementById('audioTrackDuration');
-    const durationDisplay = document.getElementById('durationDisplay');
-    const subtitleOverlay = document.getElementById('subtitleOverlay');
-    const styleSelect = document.getElementById('styleSelect');
-    const langSelect = document.getElementById('langSelect');
-    const aspectSelect = document.getElementById('aspectSelect');
-    const transitionSelect = document.getElementById('transitionSelect');
-    const analysisCard = document.getElementById('analysisCard');
-    const analysisDetails = document.getElementById('analysisDetails');
-    const exportCanvas = document.getElementById('exportCanvas');
+async function completeLogin(name, email, picture){
+  user = {name, email, picture};
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+  const avatarEl = document.getElementById('avatarInit');
+  if(picture){ avatarEl.innerHTML = `<img src="${picture}" referrerpolicy="no-referrer">`; }
+  else { avatarEl.textContent = name.slice(0,1).toUpperCase(); }
+  showToast((currentLang==='id'?'Selamat datang, ':'Welcome, ') + name);
 
-    styleSelect.value = aiMemory.preferredStyle || 'sub-style-tiktok';
+  const dbName = 'clipforge_' + email.toLowerCase().replace(/[^a-z0-9]/g,'_');
+  try{
+    db = await openUserDB(dbName);
+    await loadFromStorage();
+  }catch(err){
+    console.error('IndexedDB unavailable', err);
+    showToast(currentLang==='id'
+      ? 'Penyimpanan lokal tidak tersedia di browser ini — klip tidak akan tersimpan setelah refresh'
+      : 'Local storage isn\'t available in this browser — clips won\'t be saved after refresh');
+  }
+}
 
-    styleSelect.addEventListener('change', (e) => {
-      aiMemory.preferredStyle = e.target.value;
-      subtitleOverlay.className = `${e.target.value} absolute bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none px-2 py-1 z-40 w-[90%] flex flex-wrap justify-center items-center gap-1 transition-opacity duration-150 opacity-0`;
-      saveMemoryState();
+// --- Supabase Auth: Google OAuth (redirect flow) ---
+async function signInWithGoogle(){
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + window.location.pathname }
+  });
+  if(error){
+    console.error('Supabase OAuth error', error);
+    showToast(currentLang==='id' ? 'Google Sign-In belum aktif di proyek ini' : 'Google Sign-In isn\'t enabled on this project yet');
+    document.getElementById('gConfigWarn').classList.remove('hidden');
+  }
+  // on success, Google redirects to Supabase, then back to this page with a
+  // session in the URL — handled by onAuthStateChange / getSession below.
+}
+
+function userFromSupabase(su){
+  const meta = su.user_metadata || {};
+  return {
+    name: meta.full_name || meta.name || su.email,
+    email: su.email,
+    picture: meta.avatar_url || meta.picture || null
+  };
+}
+
+sb.auth.onAuthStateChange((event, session)=>{
+  if(session && session.user && !user){
+    const u = userFromSupabase(session.user);
+    completeLogin(u.name, u.email, u.picture);
+  }
+});
+
+window.addEventListener('load', async ()=>{
+  const { data } = await sb.auth.getSession();
+  if(data && data.session && data.session.user){
+    const u = userFromSupabase(data.session.user);
+    completeLogin(u.name, u.email, u.picture);
+  }
+});
+
+document.getElementById('loginBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('loginName').value.trim() || 'Guest';
+  const email = document.getElementById('loginEmail').value.trim() || 'guest@local';
+  completeLogin(name, email, null);
+});
+
+async function signOut(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.reload();
+}
+
+/* ===================== tabs ===================== */
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('tabMediaBody').classList.toggle('hidden', tab!=='media');
+  document.getElementById('tabAIBody').classList.toggle('hidden', tab!=='ai');
+}
+
+/* ===================== import & media bin ===================== */
+function triggerImport(){ document.getElementById('fileInput').click(); }
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files);
+  for(const f of files){ await addMediaFile(f); }
+  e.target.value = '';
+});
+
+function addMediaFile(file){
+  return new Promise((resolve)=>{
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.src = url; v.muted = true; v.preload = 'metadata';
+    v.addEventListener('loadedmetadata', ()=>{
+      v.currentTime = Math.min(0.5, v.duration/2);
     });
-
-    aspectSelect.addEventListener('change', (e) => {
-      monitorWrapper.className = e.target.value === 'portrait' ? 'aspect-portrait relative flex items-center justify-center overflow-hidden' : 'aspect-landscape relative flex items-center justify-center overflow-hidden';
-    });
-
-    dropZone.addEventListener('click', () => videoInput.click());
-    videoInput.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files[0]) {
-        currentFile = e.target.files[0];
-        currentVideoUrl = URL.createObjectURL(currentFile);
-        mainVideo.src = currentVideoUrl;
-        
-        emptyMonitor.classList.add('hidden');
-        monitorContainer.classList.remove('hidden');
-
-        mainVideo.onloadedmetadata = () => {
-          const totalSecs = Math.floor(mainVideo.duration);
-          const mins = Math.floor(totalSecs / 60).toString().padStart(2, '0');
-          const secs = (totalSecs % 60).toString().padStart(2, '0');
-          const durationStr = `${mins}:${secs}`;
-
-          durationDisplay.textContent = `Total Duration: 00:${durationStr}`;
-          videoTrackDuration.textContent = durationStr;
-          audioTrackDuration.textContent = durationStr;
-
-          videoTrackName.textContent = `${currentFile.name}`;
-          audioTrackName.textContent = `${currentFile.name} (Audio)`;
-          videoTrackLabel.classList.remove('hidden');
-          audioTrackLabel.classList.remove('hidden');
-        };
-      }
-    });
-
-    playBtn.addEventListener('click', () => {
-      if (mainVideo.paused) {
-        mainVideo.play();
-        playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
-      } else {
-        mainVideo.pause();
-        playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i>';
-      }
-      lucide.createIcons();
-    });
-
-    let lastSegmentIndex = -1;
-    mainVideo.addEventListener('timeupdate', () => {
-      const time = mainVideo.currentTime;
-      const mins = Math.floor(time / 60).toString().padStart(2, '0');
-      const secs = Math.floor(time % 60).toString().padStart(2, '0');
-      const frames = Math.floor((time % 1) * 30).toString().padStart(2, '0');
-      timecode.textContent = `00:${mins}:${secs}:${frames}`;
-
-      if (isAutoCutActive && activeCutTimeline.length > 0 && !mainVideo.paused) {
-        const segIdx = activeCutTimeline.findIndex(s => time >= s.start && time <= s.end);
-
-        if (segIdx === -1) {
-          const nextSeg = activeCutTimeline.find(s => s.start > time);
-          if (nextSeg) {
-            mainVideo.currentTime = nextSeg.start;
-            triggerTransitionEffect();
-          } else {
-            mainVideo.pause();
-          }
-        } else if (segIdx !== lastSegmentIndex) {
-          if (lastSegmentIndex !== -1) triggerTransitionEffect();
-          lastSegmentIndex = segIdx;
-        }
-      }
-
-      const activeSub = generatedSubtitles.find(sub => time >= sub.startSec && time <= sub.endSec);
-      if (activeSub) {
-        const segmentProgress = (time - activeSub.startSec) / (activeSub.endSec - activeSub.startSec);
-        const activeWordIdx = Math.min(
-          activeSub.words.length - 1,
-          Math.floor(segmentProgress * activeSub.words.length)
-        );
-
-        subtitleOverlay.innerHTML = activeSub.words.map((w, idx) => `
-          <span class="sub-word-box ${idx === activeWordIdx ? 'sub-word-active' : 'sub-word-inactive'}">
-            ${w}
-          </span>
-        `).join('');
-        subtitleOverlay.classList.remove('opacity-0');
-      } else {
-        subtitleOverlay.classList.add('opacity-0');
-      }
-    });
-
-    function triggerTransitionEffect() {
-      mainVideo.classList.add('transition-cut-flash');
-      setTimeout(() => mainVideo.classList.remove('transition-cut-flash'), 250);
-    }
-
-    function renderSubtitlesList() {
-      subtitlesList.innerHTML = generatedSubtitles.map((c, index) => `
-        <div class="text-xs p-1.5 bg-[#2a2a2a] mb-1 rounded flex items-center justify-between">
-          <span class="text-purple-300 font-mono text-[10px] mr-2">${Math.floor(c.startSec)}s</span>
-          <input type="text" value="${c.text}" data-index="${index}" class="sub-input bg-transparent text-gray-200 text-right w-full focus:outline-none focus:border-b border-purple-500" />
-          ${c.isHighlight ? '<span class="highlight-tag ml-1">Hook</span>' : ''}
-        </div>
-      `).join('');
-
-      document.querySelectorAll('.sub-input').forEach(input => {
-        input.addEventListener('change', (e) => {
-          const idx = e.target.dataset.index;
-          generatedSubtitles[idx].text = e.target.value;
-          generatedSubtitles[idx].words = e.target.value.split(' ');
-        });
-      });
-    }
-
-    function calculateSpeechSegments(pcmData, sampleRate = 16000) {
-      const chunkSize = sampleRate * 0.1;
-      const speech = [];
-      let inSpeech = false;
-      let start = 0;
-
-      for (let i = 0; i < pcmData.length; i += chunkSize) {
-        let sum = 0;
-        for (let j = 0; j < chunkSize && (i + j) < pcmData.length; j++) {
-          sum += pcmData[i + j] * pcmData[i + j];
-        }
-        const rms = Math.sqrt(sum / chunkSize);
-        const db = 20 * Math.log10(Math.max(rms, 0.00001));
-        const timeSec = i / sampleRate;
-
-        if (db >= aiMemory.sensitivityOffset) {
-          if (!inSpeech) {
-            inSpeech = true;
-            start = Math.max(0, timeSec - 0.1);
-          }
-        } else {
-          if (inSpeech) {
-            inSpeech = false;
-            speech.push({ start, end: timeSec + 0.1 });
-          }
-        }
-      }
-      if (inSpeech) speech.push({ start, end: pcmData.length / sampleRate });
-      return speech;
-    }
-
-    function autoDetectViralHighlights(subtitles) {
-      const highlightKeywords = ['viral', 'hook', 'secret', 'best', 'key', 'amazing', 'never', 'now', 'stop', 'watch', 'tips', 'rahasia', 'penting', 'trik', 'cara', 'kamu', 'lihat', 'wow', 'gokil', 'wajib'];
-      
-      return subtitles.map(sub => {
-        const textLower = sub.text.toLowerCase();
-        let score = 0;
-
-        highlightKeywords.forEach(word => {
-          if (textLower.includes(word)) score += 2;
-        });
-
-        if (sub.startSec <= 5.0) score += 3;
-
-        const wordCount = sub.words.length;
-        const duration = sub.endSec - sub.startSec;
-        if (duration > 0 && (wordCount / duration) > 2.5) score += 2;
-
-        const isHighlight = score >= 2;
-        return { ...sub, isHighlight, score };
-      });
-    }
-
-    analyzeBtn.addEventListener('click', async () => {
-      if (!currentFile) return alert("Please import a video first!");
-
-      analyzeBtn.disabled = true;
-      statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Processing PCM Audio Slices...";
-
-      try {
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
-        env.allowRemoteModels = true;
-
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        const arrayBuf = await currentFile.arrayBuffer();
-        const decoded = await audioCtx.decodeAudioData(arrayBuf);
-        
-        let pcmData;
-        if (decoded.numberOfChannels > 1) {
-          const left = decoded.getChannelData(0);
-          const right = decoded.getChannelData(1);
-          pcmData = new Float32Array(left.length);
-          for (let i = 0; i < left.length; i++) { pcmData[i] = (left[i] + right[i]) / 2; }
-        } else {
-          pcmData = decoded.getChannelData(0);
-        }
-
-        activeSpeechSegments = calculateSpeechSegments(pcmData);
-        
-        const hasWebGPU = !!navigator.gpu;
-        statusOverlay.textContent = `Running ${hasWebGPU ? 'WebGPU' : 'Low-Memory Sliced WASM'} Model...`;
-        
-        const pipelineOptions = { quantized: true, dtype: 'q8' };
-        if (hasWebGPU) pipelineOptions.device = 'webgpu';
-
-        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', pipelineOptions);
-
-        const sampleRate = 16000;
-        const sliceDuration = 10; 
-        const sliceSamples = sampleRate * sliceDuration;
-        const totalSlices = Math.ceil(pcmData.length / sliceSamples);
-        let accumulatedChunks = [];
-
-        for (let i = 0; i < totalSlices; i++) {
-          const startSample = i * sliceSamples;
-          const endSample = Math.min(pcmData.length, (i + 1) * sliceSamples);
-          const chunkData = pcmData.subarray(startSample, endSample);
-
-          statusOverlay.textContent = `Transcribing Audio Chunk ${i + 1}/${totalSlices}...`;
-
-          const chunkResult = await transcriber(chunkData, {
-            language: langSelect.value,
-            task: 'transcribe',
-            return_timestamps: true
-          });
-
-          if (chunkResult && chunkResult.chunks) {
-            const timeOffset = i * sliceDuration;
-            const shiftedChunks = chunkResult.chunks.map(c => ({
-              ...c,
-              timestamp: [c.timestamp[0] + timeOffset, c.timestamp[1] ? c.timestamp[1] + timeOffset : c.timestamp[0] + timeOffset + 2]
-            }));
-            accumulatedChunks.push(...shiftedChunks);
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 20));
-        }
-
-        if (accumulatedChunks.length > 0) {
-          const rawSubs = accumulatedChunks.map((c, idx, arr) => {
-            const start = c.timestamp[0];
-            let end = c.timestamp[1] || (start + 2);
-            if (arr[idx + 1] && end > arr[idx + 1].timestamp[0]) {
-              end = arr[idx + 1].timestamp[0] - 0.05;
-            }
-            const cleanText = c.text.trim();
-            return {
-              startSec: Math.max(0, start),
-              endSec: Math.max(start + 0.5, end),
-              text: cleanText,
-              words: cleanText.split(' ')
-            };
-          }).filter(c => c.text.length > 0);
-
-          generatedSubtitles = autoDetectViralHighlights(rawSubs);
-          
-          highlightSegments = generatedSubtitles
-            .filter(sub => sub.isHighlight)
-            .map(sub => ({ start: sub.startSec, end: sub.endSec }));
-
-          renderSubtitlesList();
-
-          analysisCard.classList.remove('hidden');
-          analysisDetails.innerHTML = `
-            <div>- Video Length: ${Math.floor(mainVideo.duration)}s</div>
-            <div>- Speech Segments: ${activeSpeechSegments.length} active</div>
-            <div>- Viral Highlights: ${highlightSegments.length} key moments</div>
-            <div class="text-purple-400 font-bold">- Choose "2. Silence Cut" or "3. Highlight Cut"</div>
-          `;
-
-          autoCutBtn.disabled = false;
-          highlightCutBtn.disabled = false;
-          statusOverlay.textContent = "Transcription Finished Safely! Select an Auto-Cut mode above.";
-        }
-      } catch (err) {
-        console.error("Transcribe Error:", err);
-        statusOverlay.textContent = `Execution Error: ${err.message || 'Check Console'}`;
-      } finally {
-        analyzeBtn.disabled = false;
-      }
-    });
-
-    autoCutBtn.addEventListener('click', () => {
-      if (activeSpeechSegments.length === 0) return alert("No speech detected.");
-
-      activeCutTimeline = activeSpeechSegments;
-      isAutoCutActive = true;
-      aiMemory.sessionsCount += 1;
-      saveMemoryState();
-
-      statusOverlay.textContent = "Silence Cut Active! Trimming dead-air gaps.";
-      mainVideo.currentTime = activeCutTimeline[0].start;
-      mainVideo.play();
-      playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
-      lucide.createIcons();
-    });
-
-    highlightCutBtn.addEventListener('click', () => {
-      if (highlightSegments.length === 0) {
-        activeCutTimeline = activeSpeechSegments.slice(0, Math.min(3, activeSpeechSegments.length));
-      } else {
-        activeCutTimeline = highlightSegments;
-      }
-
-      isAutoCutActive = true;
-      aiMemory.sessionsCount += 1;
-      saveMemoryState();
-
-      statusOverlay.textContent = `Highlight Cut Active! Playing ${activeCutTimeline.length} viral scenes only.`;
-      mainVideo.currentTime = activeCutTimeline[0].start;
-      mainVideo.play();
-      playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
-      lucide.createIcons();
-    });
-
-    exportBtn.addEventListener('click', async () => {
-      if (!currentVideoUrl) return alert("Please import media first!");
-
-      exportBtn.disabled = true;
-      statusOverlay.classList.remove('hidden');
-      statusOverlay.textContent = "Rendering highlighted media to output file...";
-
-      const isPortrait = aspectSelect.value === 'portrait';
-      exportCanvas.width = isPortrait ? 720 : 1280;
-      exportCanvas.height = isPortrait ? 1280 : 720;
-      const ctx = exportCanvas.getContext('2d');
-
-      const canvasStream = exportCanvas.captureStream(30);
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioCtx.createMediaElementSource(mainVideo);
-      const dest = audioCtx.createMediaStreamDestination();
-      source.connect(dest);
-      source.connect(audioCtx.destination);
-
-      const combinedStream = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...dest.stream.getAudioTracks()
-      ]);
-
-      const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9,opus' });
-      const chunks = [];
-
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Premiere_AI_Export_${Date.now()}.webm`;
-        a.click();
-
-        statusOverlay.textContent = "Export Complete!";
-        exportBtn.disabled = false;
+    v.addEventListener('seeked', ()=>{
+      const canvas = document.createElement('canvas');
+      canvas.width = 160; canvas.height = 90;
+      const ctx = canvas.getContext('2d');
+      try{ ctx.drawImage(v,0,0,canvas.width,canvas.height); }catch(err){}
+      const thumb = canvas.toDataURL('image/jpeg', 0.7);
+      const item = {
+        id: 'm'+(uidCounter++), name: file.name, url, file,
+        duration: v.duration || 0, thumb
       };
+      media.push(item);
+      renderMediaList();
+      if(db){ idbPut('media', {id:item.id, name:item.name, duration:item.duration, thumb:item.thumb, blob:file}).catch(err=>console.error('save failed', err)); }
+      resolve(item);
+    }, {once:true});
+  });
+}
 
-      isAutoCutActive = true;
-      mainVideo.currentTime = activeCutTimeline.length > 0 ? activeCutTimeline[0].start : 0;
-      await mainVideo.play();
-      recorder.start();
+function renderMediaList(){
+  const list = document.getElementById('mediaList');
+  if(media.length===0){
+    list.innerHTML = `<div style="color:var(--muted-2);font-size:12px;padding:8px 2px">${t('emptyMedia')}</div>`;
+    return;
+  }
+  list.innerHTML = media.map(m=>`
+    <div class="media-item" draggable="true" data-mid="${m.id}" ondragstart="onMediaDragStart(event,'${m.id}')" onclick="previewMedia('${m.id}')">
+      <img class="media-thumb" src="${m.thumb}">
+      <div class="media-meta">
+        <div class="media-name">${escapeHtml(m.name)}</div>
+        <div class="media-dur mono">${fmtTime(m.duration)}</div>
+        <span class="media-tag">${currentLang==='id'?'seret ke timeline':'drag to timeline'}</span>
+      </div>
+    </div>
+  `).join('');
+}
 
-      let transitionAlpha = 0;
+function previewMedia(mid){
+  const m = media.find(x=>x.id===mid);
+  if(!m) return;
+  const v = document.getElementById('previewVideo');
+  v.src = m.url;
+  v.style.display = 'block';
+  document.getElementById('emptyPreview').style.display = 'none';
+  v.play().catch(()=>{});
+}
 
-      const renderFrame = () => {
-        if (mainVideo.ended || mainVideo.paused) {
-          recorder.stop();
-          return;
-        }
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtTime(sec){
+  sec = Math.max(0, sec||0);
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
 
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+/* ===================== timeline ===================== */
+let dragMediaId = null;
+function onMediaDragStart(e, mid){ dragMediaId = mid; }
 
-        const vRatio = mainVideo.videoWidth / mainVideo.videoHeight;
-        const cRatio = exportCanvas.width / exportCanvas.height;
-        let dw = exportCanvas.width;
-        let dh = exportCanvas.height;
-        let dx = 0;
-        let dy = 0;
+const trackEl = document.getElementById('track');
+trackEl.addEventListener('dragover', e=>e.preventDefault());
+trackEl.addEventListener('drop', e=>{
+  e.preventDefault();
+  if(dragMediaId){
+    const m = media.find(x=>x.id===dragMediaId);
+    if(m){
+      timeline.push({id:'t'+(uidCounter++), mediaId:m.id, name:m.name, url:m.url,
+        duration:m.duration, trimIn:0, trimOut:m.duration});
+      renderTimeline();
+    }
+    dragMediaId = null;
+  }
+});
 
-        if (vRatio > cRatio) {
-          dh = exportCanvas.width / vRatio;
-          dy = (exportCanvas.height - dh) / 2;
-        } else {
-          dw = exportCanvas.height * vRatio;
-          dx = (exportCanvas.width - dw) / 2;
-        }
+function renderTimeline(){
+  persistTimeline();
+  document.getElementById('sequenceInfo').textContent =
+    timeline.length + (currentLang==='id' ? ' klip dalam sekuens' : ' clips in sequence');
+  if(timeline.length===0){
+    trackEl.innerHTML = `<div class="tl-empty">${t('emptyTimeline')}</div>`;
+    return;
+  }
+  const pxPerSec = 26;
+  trackEl.innerHTML = timeline.map((c,idx)=>{
+    const dur = Math.max(0.2, c.trimOut - c.trimIn);
+    const w = Math.max(50, dur*pxPerSec);
+    return `
+    <div class="tl-clip" style="width:${w}px" draggable="true" data-idx="${idx}"
+      ondragstart="onClipDragStart(event,${idx})" ondragover="onClipDragOver(event,${idx})"
+      ondrop="onClipDrop(event,${idx})" ondragend="onClipDragEnd(event)">
+      <div class="trim-handle left" onmousedown="startTrim(event, ${idx}, 'left')"></div>
+      <div class="trim-handle right" onmousedown="startTrim(event, ${idx}, 'right')"></div>
+      <div class="tl-clip-dur mono">${fmtTime(dur)}</div>
+      <div class="tl-clip-label">${idx+1}. ${escapeHtml(c.name)}</div>
+    </div>`;
+  }).join('');
+}
 
-        ctx.drawImage(mainVideo, dx, dy, dw, dh);
+let dragClipIdx = null;
+function onClipDragStart(e, idx){ dragClipIdx = idx; e.target.classList.add('dragging'); }
+function onClipDragEnd(e){ e.target.classList.remove('dragging');
+  document.querySelectorAll('.tl-clip').forEach(el=>el.classList.remove('drop-target')); }
+function onClipDragOver(e, idx){ e.preventDefault(); e.currentTarget.classList.add('drop-target'); }
+function onClipDrop(e, idx){
+  e.preventDefault();
+  if(dragClipIdx===null || dragClipIdx===idx) return;
+  const moved = timeline.splice(dragClipIdx,1)[0];
+  timeline.splice(idx,0,moved);
+  dragClipIdx = null;
+  renderTimeline();
+}
 
-        if (transitionAlpha > 0) {
-          ctx.fillStyle = transitionSelect.value === 'flash' ? `rgba(255, 255, 255, ${transitionAlpha})` : `rgba(0, 0, 0, ${transitionAlpha})`;
-          ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-          transitionAlpha -= 0.1;
-        }
+let trimState = null;
+function startTrim(e, idx, side){
+  e.stopPropagation(); e.preventDefault();
+  trimState = {idx, side, startX:e.clientX, orig: {...timeline[idx]}};
+  window.addEventListener('mousemove', onTrimMove);
+  window.addEventListener('mouseup', onTrimUp);
+}
+function onTrimMove(e){
+  if(!trimState) return;
+  const dx = e.clientX - trimState.startX;
+  const dSec = dx/26;
+  const c = timeline[trimState.idx];
+  const o = trimState.orig;
+  if(trimState.side==='left'){
+    c.trimIn = Math.min(o.trimOut-0.2, Math.max(0, o.trimIn + dSec));
+  } else {
+    c.trimOut = Math.max(o.trimIn+0.2, Math.min(o.duration, o.trimOut + dSec));
+  }
+  renderTimeline();
+}
+function onTrimUp(){
+  trimState = null;
+  window.removeEventListener('mousemove', onTrimMove);
+  window.removeEventListener('mouseup', onTrimUp);
+}
+function clearTimeline(){ timeline = []; renderTimeline(); }
 
-        const activeSub = generatedSubtitles.find(s => mainVideo.currentTime >= s.startSec && mainVideo.currentTime <= s.endSec);
-        if (activeSub && activeSub.words) {
-          const segProgress = (mainVideo.currentTime - activeSub.startSec) / (activeSub.endSec - activeSub.startSec);
-          const activeIdx = Math.min(activeSub.words.length - 1, Math.floor(segProgress * activeSub.words.length));
+/* ===================== transport ===================== */
+function playPause(){
+  const v = document.getElementById('previewVideo');
+  if(v.paused) v.play().catch(()=>{}); else v.pause();
+}
+document.getElementById('previewVideo').addEventListener('timeupdate', (e)=>{
+  const v = e.target;
+  document.getElementById('tlTime').textContent = fmtTime(v.currentTime)+' / '+fmtTime(v.duration||0);
+});
 
-          ctx.font = 'bold 28px sans-serif';
-          let totalWidth = 0;
-          const wordMetrics = activeSub.words.map(w => {
-            const m = ctx.measureText(w + ' ');
-            totalWidth += m.width;
-            return { word: w, width: m.width };
-          });
+/* ===================== toast ===================== */
+function showToast(msg, loading){
+  const el = document.getElementById('toast');
+  el.innerHTML = (loading?'<span class="spin"></span>':'') + msg;
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  if(!loading){ showToast._t = setTimeout(()=>{ el.style.display='none'; }, 3200); }
+}
+function hideToast(){ document.getElementById('toast').style.display = 'none'; }
 
-          let startX = (exportCanvas.width - totalWidth) / 2;
-          const startY = exportCanvas.height - 100;
+/* ===================== templates ===================== */
+function applyTemplate(){
+  const v = document.getElementById('tplSelect').value;
+  const map = {
+    hook: currentLang==='id'
+      ? "Buat hook 3 detik pertama yang sangat kuat dari klip-klip ini untuk video TikTok. Sarankan kalimat pembuka, momen visual mana yang dipakai, dan gaya caption."
+      : "Create a very strong first-3-seconds hook from these clips for a TikTok video. Suggest the opening line, which visual moment to use, and a caption style.",
+    reel: currentLang==='id'
+      ? "Sarankan urutan potongan cepat yang mengikuti beat musik untuk Instagram Reel berdurasi 15-30 detik dari klip-klip ini."
+      : "Suggest a fast-cut sequence that follows a music beat for a 15-30s Instagram Reel using these clips.",
+    highlights: currentLang==='id'
+      ? "Pilih momen-momen terbaik dari semua klip yang diimpor dan susun jadi highlight reel yang menarik untuk marketing."
+      : "Pick the best moments across all imported clips and assemble them into an engaging marketing highlight reel.",
+    captions: currentLang==='id'
+      ? "Berikan 5 ide caption bold/tegas yang cocok untuk video marketing pendek ini, lengkap dengan nada suara mereknya."
+      : "Give me 5 bold caption ideas suited to this short marketing video, including tone of voice.",
+    silence: currentLang==='id'
+      ? "Sarankan cara merapikan tempo video ini dengan menghapus jeda sunyi dan mempercepat transisi antar klip."
+      : "Suggest how to tighten this video's pacing by removing silent gaps and speeding up transitions between clips.",
+  };
+  if(map[v]) document.getElementById('promptInput').value = map[v];
+}
 
-          const currentStyle = styleSelect.value;
-          let activeBg = '#facc15';
-          let activeFg = '#000000';
-          let inactiveBg = 'rgba(0, 0, 0, 0.75)';
-          let inactiveFg = '#ffffff';
+/* ===================== Claude API helper ===================== */
+async function callClaude(content){
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      messages: [{ role:"user", content }]
+    })
+  });
+  const data = await response.json();
+  const text = (data.content||[])
+    .filter(b=>b.type==='text')
+    .map(b=>b.text).join('\n');
+  return text;
+}
 
-          if (currentStyle === 'sub-style-netflix') {
-            activeBg = '#ffffff';
-            activeFg = '#000000';
-            inactiveBg = 'rgba(20, 20, 20, 0.85)';
-            inactiveFg = '#cccccc';
-          } else if (currentStyle === 'sub-style-neon') {
-            activeBg = '#00f0ff';
-            activeFg = '#000000';
-            inactiveBg = 'rgba(10, 10, 20, 0.9)';
-            inactiveFg = '#00f0ff';
-          } else if (currentStyle === 'sub-style-minimal') {
-            activeBg = '#e5e5e5';
-            activeFg = '#171717';
-            inactiveBg = 'rgba(23, 23, 23, 0.9)';
-            inactiveFg = '#a3a3a3';
-          }
+function clipNames(){
+  const list = timeline.length ? timeline : media;
+  return list.map(c=>c.name).join(', ') || (currentLang==='id'?'(belum ada klip diimpor)':'(no clips imported yet)');
+}
 
-          wordMetrics.forEach((wm, idx) => {
-            const isHighlight = idx === activeIdx;
-            
-            ctx.fillStyle = isHighlight ? activeBg : inactiveBg;
-            ctx.fillRect(startX - 4, startY - 28, wm.width + 4, 36);
+/* ---- Prompt-based edit ---- */
+async function runPromptEdit(){
+  const prompt = document.getElementById('promptInput').value.trim();
+  if(!prompt){ showToast(currentLang==='id'?'Tulis prompt dulu':'Write a prompt first'); return; }
+  const btn = document.getElementById('promptRunBtn');
+  btn.disabled = true;
+  showToast(currentLang==='id'?'AI sedang menyusun ide edit…':'AI is drafting edit ideas…', true);
+  try{
+    const sys = `You are an AI video editing assistant inside a marketing video editor (like Premiere Pro but prompt-driven), used for TikTok/Reels content.
+Imported clips: ${clipNames()}.
+User request: "${prompt}"
+Respond ONLY with valid JSON, no markdown fences, no preamble, matching exactly this shape:
+{"summary":"one-sentence plan in ${currentLang==='id'?'Indonesian':'English'}","hookLine":"a punchy opening line/caption in ${currentLang==='id'?'Indonesian':'English'}","captionIdeas":["idea1","idea2","idea3"],"suggestedOrder":["clip name in suggested order",...]}`;
+    const text = await callClaude(sys);
+    const json = safeParseJSON(text);
+    renderPromptResult(json, prompt);
+  }catch(err){
+    showResultError(err);
+  } finally {
+    btn.disabled = false; hideToast();
+  }
+}
+function safeParseJSON(text){
+  try{
+    const cleaned = text.replace(/```json|```/g,'').trim();
+    return JSON.parse(cleaned);
+  }catch(e){ return {summary:text}; }
+}
+function renderPromptResult(json, prompt){
+  const el = document.getElementById('resultsBody');
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.innerHTML = `
+    <h4>${currentLang==='id'?'Rencana edit AI':'AI edit plan'}</h4>
+    <div>${escapeHtml(json.summary||'')}</div>
+    ${json.hookLine ? `<div style="margin-top:8px"><b>${currentLang==='id'?'Hook':'Hook'}:</b> "${escapeHtml(json.hookLine)}"</div>` : ''}
+    ${json.captionIdeas ? `<div style="margin-top:8px"><b>${currentLang==='id'?'Ide caption':'Caption ideas'}:</b><ul style="margin:4px 0 0 16px;padding:0">${json.captionIdeas.map(c=>`<li>${escapeHtml(c)}</li>`).join('')}</ul></div>` : ''}
+    ${json.suggestedOrder ? `<div style="margin-top:8px"><b>${currentLang==='id'?'Urutan disarankan':'Suggested order'}:</b> ${json.suggestedOrder.map(escapeHtml).join(' → ')}</div>` : ''}
+    <div style="margin-top:6px"><button class="apply-btn" data-translate="1">${currentLang==='id'?'Terjemahkan hasil':'Translate result'}</button>
+    ${json.suggestedOrder ? `<button class="apply-btn" data-apply="1">${currentLang==='id'?'Terapkan urutan ini':'Apply this order'}</button>` : ''}</div>
+  `;
+  clearEmptyRight();
+  el.prepend(card);
+  const applyBtn = card.querySelector('[data-apply]');
+  if(applyBtn) applyBtn.addEventListener('click', ()=>applySuggestedOrder(json.suggestedOrder));
+  const trBtn = card.querySelector('[data-translate]');
+  trBtn.addEventListener('click', ()=>translateCard(card, json));
+}
+function applySuggestedOrder(order){
+  if(!order || !timeline.length){ showToast(currentLang==='id'?'Tidak ada timeline untuk diurutkan':'No timeline to reorder'); return; }
+  const newTl = [];
+  order.forEach(name=>{
+    const idx = timeline.findIndex(c=>c.name===name && !newTl.includes(c));
+    if(idx>-1) newTl.push(timeline[idx]);
+  });
+  timeline.forEach(c=>{ if(!newTl.includes(c)) newTl.push(c); });
+  timeline = newTl;
+  renderTimeline();
+  showToast(currentLang==='id'?'Urutan diterapkan ke timeline':'Order applied to timeline');
+}
+async function translateCard(card, json){
+  showToast(currentLang==='id'?'Menerjemahkan…':'Translating…', true);
+  const target = currentLang==='id' ? 'English' : 'Indonesian';
+  try{
+    const text = await callClaude(`Translate this JSON's string values to ${target}, keep the same JSON shape, respond ONLY with JSON: ${JSON.stringify(json)}`);
+    const translated = safeParseJSON(text);
+    renderPromptResult(translated, '');
+  }catch(e){ showResultError(e); }
+  hideToast();
+}
 
-            ctx.fillStyle = isHighlight ? activeFg : inactiveFg;
-            ctx.textAlign = 'left';
-            ctx.fillText(wm.word, startX, startY);
+/* ---- Auto Transcript (demo placeholder - real ASR needs a backend model) ---- */
+function runAutoTranscript(){
+  if(!timeline.length && !media.length){ showToast(currentLang==='id'?'Impor klip dulu':'Import a clip first'); return; }
+  const source = timeline.length ? timeline : media;
+  const lines = source.map((c,i)=>{
+    const segs = 3;
+    let out = `<b>${escapeHtml(c.name)}</b><br>`;
+    for(let s=0;s<segs;s++){
+      const t0 = (c.duration/segs*s).toFixed(1);
+      out += `<span class="mono" style="color:var(--muted-2)">${fmtTime(t0)}</span> — <span contenteditable="true" style="border-bottom:1px dashed var(--border)">${currentLang==='id' ? '[teks placeholder — hubungkan model ASR seperti Whisper untuk transkrip asli]' : '[placeholder line — connect an ASR model like Whisper for a real transcript]'}</span><br>`;
+    }
+    return out;
+  }).join('<br>');
+  const el = document.getElementById('resultsBody');
+  clearEmptyRight();
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.innerHTML = `<h4>${currentLang==='id'?'Transkrip':'Transcript'}<span class="badge">${currentLang==='id'?'DEMO':'DEMO'}</span></h4>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">${currentLang==='id'?'Ini contoh tata letak. Sambungkan API speech-to-text (mis. Whisper) di backend untuk transkrip asli.':'This shows the intended layout. Connect a real speech-to-text API (e.g. Whisper) on a backend for real transcripts.'}</div>
+    ${lines}`;
+  el.prepend(card);
+}
 
-            startX += wm.width;
-          });
-        }
+/* ---- Auto Cut: real silence detection via Web Audio decodeAudioData ---- */
+async function runAutoCut(){
+  if(!timeline.length){ showToast(currentLang==='id'?'Tambahkan klip ke timeline dulu':'Add a clip to the timeline first'); return; }
+  showToast(currentLang==='id'?'Menganalisis audio untuk jeda sunyi…':'Analyzing audio for silent gaps…', true);
+  const el = document.getElementById('resultsBody');
+  clearEmptyRight();
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.innerHTML = `<h4>${currentLang==='id'?'Potong Otomatis':'Auto Cut'}</h4><div id="autoCutLog" style="font-size:11.5px;color:var(--muted)"></div>`;
+  el.prepend(card);
+  const log = card.querySelector('#autoCutLog');
+  let totalRemoved = 0;
+  for(const clip of [...timeline]){
+    try{
+      const buf = await fetch(clip.url).then(r=>r.arrayBuffer());
+      const ctx = new (window.OfflineAudioContext || window.AudioContext)(1,1,44100);
+      const audioCtx = new AudioContext();
+      const decoded = await audioCtx.decodeAudioData(buf.slice(0));
+      const data = decoded.getChannelData(0);
+      const sr = decoded.sampleRate;
+      const win = Math.floor(sr*0.25);
+      const threshold = 0.02;
+      let silentWindows = 0, totalWindows = 0;
+      for(let i=0;i<data.length;i+=win){
+        let sum=0, n=0;
+        for(let j=i;j<Math.min(i+win,data.length);j++){ sum += data[j]*data[j]; n++; }
+        const rms = Math.sqrt(sum/Math.max(1,n));
+        totalWindows++;
+        if(rms < threshold) silentWindows++;
+      }
+      const silentSec = (silentWindows*0.25);
+      totalRemoved += silentSec;
+      clip.trimOut = Math.max(clip.trimIn+0.2, clip.trimOut - Math.min(silentSec, (clip.trimOut-clip.trimIn)*0.4));
+      log.innerHTML += `${escapeHtml(clip.name)}: ${currentLang==='id'?'sekitar':'~'} ${silentSec.toFixed(1)}s ${currentLang==='id'?'sunyi terdeteksi, timeline dipangkas':'of silence detected, timeline trimmed'}<br>`;
+      audioCtx.close();
+    }catch(err){
+      log.innerHTML += `${escapeHtml(clip.name)}: ${currentLang==='id'?'audio tidak bisa dianalisis di browser ini':'audio could not be analyzed in this browser'}<br>`;
+    }
+  }
+  renderTimeline();
+  hideToast();
+  showToast(currentLang==='id'?`Selesai — ~${totalRemoved.toFixed(1)}s dipangkas`:`Done — ~${totalRemoved.toFixed(1)}s trimmed`);
+}
 
-        requestAnimationFrame(renderFrame);
-      };
+/* ---- Auto Hook / Best Scenes: real Claude vision on captured frames ---- */
+function captureFrameFromUrl(url, atRatio){
+  return new Promise((resolve)=>{
+    const v = document.createElement('video');
+    v.src = url; v.muted = true; v.crossOrigin = 'anonymous';
+    v.addEventListener('loadedmetadata', ()=>{ v.currentTime = Math.max(0.1, v.duration*atRatio); });
+    v.addEventListener('seeked', ()=>{
+      const c = document.createElement('canvas');
+      c.width = 320; c.height = 180;
+      const ctx = c.getContext('2d');
+      try{ ctx.drawImage(v,0,0,c.width,c.height); }catch(e){}
+      resolve(c.toDataURL('image/jpeg',0.7).split(',')[1]);
+    }, {once:true});
+    v.addEventListener('error', ()=>resolve(null));
+  });
+}
 
-      renderFrame();
+async function runAutoHook(){ await runVisionAnalysis('hook'); }
+async function runSceneChoose(){ await runVisionAnalysis('scenes'); }
+
+async function runVisionAnalysis(mode){
+  const source = media.length ? media : timeline;
+  if(!source.length){ showToast(currentLang==='id'?'Impor klip dulu':'Import clips first'); return; }
+  showToast(currentLang==='id'?'AI menganalisis frame video…':'AI is analyzing video frames…', true);
+  try{
+    const frames = [];
+    for(const c of source.slice(0,6)){
+      const b64 = await captureFrameFromUrl(c.url, 0.35);
+      if(b64) frames.push({name:c.name, b64});
+    }
+    const content = [{type:"text", text:
+      (mode==='hook'
+        ? `You're picking the strongest opening "hook" frame for a TikTok/Reels marketing video from these clip thumbnails. `
+        : `Rank these clip thumbnails by how strong each scene is for a marketing short-form video. `)
+      + `Respond ONLY as JSON: {"ranking":[{"clip":"name","reason":"why, in ${currentLang==='id'?'Indonesian':'English'}"}], "topPick":"clip name"}`
+    }];
+    frames.forEach(f=>{
+      content.push({type:"text", text:`Clip: ${f.name}`});
+      content.push({type:"image", source:{type:"base64", media_type:"image/jpeg", data:f.b64}});
     });
-  </script>
+    const text = await callClaude(content);
+    const json = safeParseJSON(text);
+    renderVisionResult(json, mode);
+  }catch(err){ showResultError(err); }
+  hideToast();
+}
+function renderVisionResult(json, mode){
+  const el = document.getElementById('resultsBody');
+  clearEmptyRight();
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  const title = mode==='hook' ? (currentLang==='id'?'Pilihan Hook':'Hook Pick') : (currentLang==='id'?'Ranking Adegan':'Scene Ranking');
+  card.innerHTML = `<h4>${title}</h4>
+    ${json.topPick ? `<div><b>${currentLang==='id'?'Pilihan teratas':'Top pick'}:</b> ${escapeHtml(json.topPick)}</div>`:''}
+    ${json.ranking ? `<ul style="margin:8px 0 0 16px;padding:0">${json.ranking.map(r=>`<li><b>${escapeHtml(r.clip)}</b> — ${escapeHtml(r.reason||'')}</li>`).join('')}</ul>` : `<div>${escapeHtml(JSON.stringify(json))}</div>`}
+    ${json.topPick && timeline.length ? `<button class="apply-btn" data-move="1">${currentLang==='id'?'Jadikan klip pertama':'Move to start of timeline'}</button>` : ''}
+  `;
+  el.prepend(card);
+  const moveBtn = card.querySelector('[data-move]');
+  if(moveBtn) moveBtn.addEventListener('click', ()=>{
+    const idx = timeline.findIndex(c=>c.name===json.topPick);
+    if(idx>-1){ const c = timeline.splice(idx,1)[0]; timeline.unshift(c); renderTimeline();
+      showToast(currentLang==='id'?'Dipindahkan ke awal':'Moved to start'); }
+  });
+}
+
+function showResultError(err){
+  const el = document.getElementById('resultsBody');
+  clearEmptyRight();
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.innerHTML = `<h4 style="color:var(--render)">${currentLang==='id'?'AI gagal merespons':'AI request failed'}</h4>
+    <div style="color:var(--muted)">${escapeHtml(String(err.message||err))}</div>`;
+  el.prepend(card);
+}
+function clearEmptyRight(){
+  const empty = document.querySelector('.empty-right');
+  if(empty) empty.remove();
+}
+
+/* ===================== Render / Export (real client-side render) ===================== */
+function openRenderModal(){
+  if(!timeline.length){ showToast(currentLang==='id'?'Tambahkan klip ke timeline dulu':'Add clips to the timeline first'); return; }
+  document.getElementById('renderModal').style.display = 'flex';
+  document.getElementById('renderFill').style.width = '0%';
+  document.getElementById('renderStatus').textContent = t('renderPrep');
+  document.getElementById('renderNote').textContent = '';
+  document.getElementById('renderCloseBtn').classList.remove('hidden');
+  startRender();
+}
+function closeRenderModal(){ document.getElementById('renderModal').style.display = 'none'; }
+
+async function startRender(){
+  const canvas = document.getElementById('canvasRender');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 1080; canvas.height = 1920;
+  const stream = canvas.captureStream(30);
+
+  // audio mix
+  const audioCtx = new AudioContext();
+  const dest = audioCtx.createMediaStreamDestination();
+  stream.addTrack(dest.stream.getAudioTracks()[0]);
+
+  const recorder = new MediaRecorder(stream, {mimeType: pickMime()});
+  const chunks = [];
+  recorder.ondataavailable = e=>{ if(e.data.size>0) chunks.push(e.data); };
+  const done = new Promise(res=>{ recorder.onstop = res; });
+  recorder.start();
+
+  const total = timeline.length;
+  for(let i=0;i<timeline.length;i++){
+    const clip = timeline[i];
+    document.getElementById('renderStatus').textContent =
+      (currentLang==='id'?'Merender klip ':'Rendering clip ')+(i+1)+'/'+total+': '+clip.name;
+    document.getElementById('renderFill').style.width = Math.round((i/total)*100)+'%';
+    await playClipToCanvas(clip, ctx, canvas, audioCtx, dest);
+  }
+  document.getElementById('renderFill').style.width = '100%';
+  document.getElementById('renderStatus').textContent = currentLang==='id'?'Menyelesaikan berkas…':'Finalizing file…';
+  recorder.stop();
+  await done;
+  audioCtx.close();
+
+  const blob = new Blob(chunks, {type: pickMime()});
+  const url = URL.createObjectURL(blob);
+  document.getElementById('renderStatus').textContent = currentLang==='id'?'Selesai! File siap diunduh.':'Done! File is ready to download.';
+  document.getElementById('renderNote').innerHTML =
+    `<a href="${url}" download="clipforge-export.webm" style="color:var(--ai);font-weight:600">${currentLang==='id'?'⤓ Unduh video (.webm)':'⤓ Download video (.webm)'}</a>`;
+}
+function pickMime(){
+  const opts = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(const o of opts){ if(MediaRecorder.isTypeSupported(o)) return o; }
+  return 'video/webm';
+}
+function playClipToCanvas(clip, ctx, canvas, audioCtx, dest){
+  return new Promise((resolve)=>{
+    const v = document.createElement('video');
+    v.src = clip.url; v.muted = false; v.playsInline = true;
+    v.addEventListener('loadedmetadata', ()=>{
+      v.currentTime = clip.trimIn;
+      try{
+        const src = audioCtx.createMediaElementSource(v);
+        src.connect(dest);
+      }catch(e){ /* some browsers restrict double-connecting; ignore */ }
+      v.play().catch(()=>{});
+    });
+    let raf;
+    function draw(){
+      if(v.currentTime >= clip.trimOut || v.ended){
+        cancelAnimationFrame(raf);
+        v.pause();
+        resolve();
+        return;
+      }
+      // letterbox/fit into 1080x1920 canvas
+      const scale = Math.min(canvas.width/v.videoWidth, canvas.height/v.videoHeight);
+      const w = v.videoWidth*scale, h = v.videoHeight*scale;
+      const x = (canvas.width-w)/2, y = (canvas.height-h)/2;
+      ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      try{ ctx.drawImage(v, x, y, w, h); }catch(e){}
+      raf = requestAnimationFrame(draw);
+    }
+    v.addEventListener('play', ()=>{ raf = requestAnimationFrame(draw); });
+    v.addEventListener('error', ()=>resolve());
+  });
+}
+
+/* init */
+switchTab('media');
+renderMediaList();
+renderTimeline();
+</script>
 </body>
 </html>
