@@ -1,16 +1,28 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+function normalizeR2Config() {
+  const raw = String(process.env.R2_ENDPOINT || '').trim();
+  if (!raw) return { endpoint: '', inferredBucket: '' };
+  try {
+    const url = new URL(raw);
+    const parts = url.pathname.split('/').filter(Boolean);
+    return { endpoint: url.origin, inferredBucket: parts[0] || '' };
+  } catch {
+    return { endpoint: raw.replace(/\/+$/, ''), inferredBucket: '' };
+  }
+}
+
+const r2Config = normalizeR2Config();
+const bucket = process.env.R2_BUCKET || r2Config.inferredBucket;
 const R2 = new S3Client({
   region: 'auto',
-  endpoint: process.env.R2_ENDPOINT,
+  endpoint: r2Config.endpoint,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || ''
   }
 });
-
-const bucket = process.env.R2_BUCKET;
 const worker = process.env.RENDER_WORKER_URL;
 const workerSecret = process.env.RENDER_WORKER_SECRET;
 
@@ -21,7 +33,7 @@ function json(res, status, body) {
 
 function assertConfig({ requireWorker = true } = {}) {
   const missing = [];
-  if (!process.env.R2_ENDPOINT) missing.push('R2_ENDPOINT');
+  if (!r2Config.endpoint) missing.push('R2_ENDPOINT');
   if (!process.env.R2_ACCESS_KEY_ID) missing.push('R2_ACCESS_KEY_ID');
   if (!process.env.R2_SECRET_ACCESS_KEY) missing.push('R2_SECRET_ACCESS_KEY');
   if (!bucket) missing.push('R2_BUCKET');
@@ -111,9 +123,7 @@ export default async function handler(req, res) {
         if (!body.plan?.clips?.length) return json(res, 400, { error: 'The edit plan has no clips.' });
         const sources = {};
         for (const [assetId, value] of Object.entries(body.sources || {})) {
-          const key = typeof value === 'string'
-            ? value
-            : value?.key;
+          const key = typeof value === 'string' ? value : value?.key;
           if (!key || !String(key).startsWith('uploads/')) continue;
           if (!(await objectExists(key))) return json(res, 404, { error: `Cloud source is not uploaded yet: ${key}` });
           sources[assetId] = { key, url: await signGet(key, 86400) };
