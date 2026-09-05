@@ -1,7 +1,7 @@
 {
   "name": "claude-ai-editor",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,8 +11,7 @@
   "dependencies": {
     "@ffmpeg/core": "0.12.10",
     "@ffmpeg/ffmpeg": "0.12.15",
-    "@ffmpeg/util": "0.12.2",
-    "@huggingface/transformers": "4.2.0"
+    "@ffmpeg/util": "0.12.2"
   },
   "devDependencies": {
     "vite": "7.1.7"
