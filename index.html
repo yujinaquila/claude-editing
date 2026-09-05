@@ -11,52 +11,18 @@
       const originalCreate = URL.createObjectURL.bind(URL);
       const originalRevoke = URL.revokeObjectURL.bind(URL);
       const mediaUrls = new Set();
-      URL.createObjectURL = (object) => {
-        const url = originalCreate(object);
-        if (object instanceof File && /^video\//i.test(object.type)) mediaUrls.add(url);
-        return url;
-      };
-      URL.revokeObjectURL = (url) => { if (mediaUrls.has(url)) return; originalRevoke(url); };
-      window.addEventListener('beforeunload', () => { for (const url of mediaUrls) originalRevoke(url); mediaUrls.clear(); });
+      URL.createObjectURL = (object) => { const url=originalCreate(object); if(object instanceof File && /^video\//i.test(object.type))mediaUrls.add(url); return url; };
+      URL.revokeObjectURL = (url) => { if(mediaUrls.has(url))return; originalRevoke(url); };
+      window.addEventListener('beforeunload',()=>{for(const url of mediaUrls)originalRevoke(url);mediaUrls.clear()});
     })();
     (() => {
-      const originalFetch = window.fetch.bind(window);
-      const SMALL = '/onnx-community/whisper-small/';
-      const TINY = '/onnx-community/whisper-tiny/';
-      function rewriteUrl(value) {
-        try {
-          const url = new URL(value, location.href);
-          if (url.hostname === 'huggingface.co' && url.pathname.includes(SMALL)) {
-            url.pathname = url.pathname.replace(SMALL, TINY);
-            return url.toString();
-          }
-          return value;
-        } catch (_) { return value; }
-      }
-      window.fetch = (input, init) => {
-        if (typeof input === 'string' || input instanceof URL) return originalFetch(rewriteUrl(input), init);
-        if (input instanceof Request) {
-          const rewritten = rewriteUrl(input.url);
-          if (rewritten !== input.url) return originalFetch(new Request(rewritten, input), init);
-        }
-        return originalFetch(input, init);
-      };
+      const originalFetch=window.fetch.bind(window),SMALL='/onnx-community/whisper-small/',TINY='/onnx-community/whisper-tiny/';
+      function rewriteUrl(value){try{const url=new URL(value,location.href);if(url.hostname==='huggingface.co'&&url.pathname.includes(SMALL)){url.pathname=url.pathname.replace(SMALL,TINY);return url.toString()}return value}catch(_){return value}}
+      window.fetch=(input,init)=>{if(typeof input==='string'||input instanceof URL)return originalFetch(rewriteUrl(input),init);if(input instanceof Request){const rewritten=rewriteUrl(input.url);if(rewritten!==input.url)return originalFetch(new Request(rewritten,input),init)}return originalFetch(input,init)};
     })();
     (() => {
-      const MIME = { mp4:'video/mp4', m4v:'video/mp4', mov:'video/quicktime', webm:'video/webm', ogv:'video/ogg', avi:'video/x-msvideo', mkv:'video/x-matroska', mpeg:'video/mpeg', mpg:'video/mpeg', ts:'video/mp2t', mts:'video/mp2t', m2ts:'video/mp2t' };
-      const extOf = (name) => String(name || '').toLowerCase().split('.').pop();
-      document.addEventListener('change', (event) => {
-        const input = event.target;
-        if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
-        const files = Array.from(input.files || []); if (!files.length) return;
-        const dt = new DataTransfer(); let changed = false;
-        for (const file of files) {
-          const mime=MIME[extOf(file.name)];
-          if (mime && (!file.type || !file.type.startsWith('video/'))) { dt.items.add(new File([file],file.name,{type:mime,lastModified:file.lastModified})); changed=true; }
-          else dt.items.add(file);
-        }
-        if(changed) input.files=dt.files;
-      }, true);
+      const MIME={mp4:'video/mp4',m4v:'video/mp4',mov:'video/quicktime',webm:'video/webm',ogv:'video/ogg',avi:'video/x-msvideo',mkv:'video/x-matroska',mpeg:'video/mpeg',mpg:'video/mpeg',ts:'video/mp2t',mts:'video/mp2t',m2ts:'video/mp2t'};
+      document.addEventListener('change',event=>{const input=event.target;if(!(input instanceof HTMLInputElement)||input.type!=='file')return;const files=Array.from(input.files||[]);if(!files.length)return;const dt=new DataTransfer();let changed=false;for(const file of files){const ext=String(file.name||'').toLowerCase().split('.').pop(),mime=MIME[ext];if(mime&&(!file.type||!file.type.startsWith('video/'))){dt.items.add(new File([file],file.name,{type:mime,lastModified:file.lastModified}));changed=true}else dt.items.add(file)}if(changed)input.files=dt.files},true);
     })();
   </script>
 </head>
@@ -69,5 +35,6 @@
   <script type="module" src="/src/render-export-fix.js"></script>
   <script type="module" src="/src/editor-runtime-fix.js"></script>
   <script type="module" src="/src/ai-edit-engine.js"></script>
+  <script type="module" src="/src/transition-preview.js"></script>
 </body>
 </html>
