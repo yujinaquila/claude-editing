@@ -1,5 +1,6 @@
 (() => {
   const filesByName = new Map();
+  let selectedName = null;
   const rememberFiles = files => { for (const file of files || []) filesByName.set(file.name, file); };
 
   document.addEventListener('change', event => {
@@ -7,6 +8,10 @@
     if (input instanceof HTMLInputElement && input.type === 'file') rememberFiles(input.files);
   }, true);
   document.addEventListener('drop', event => rememberFiles(event.dataTransfer?.files), true);
+  document.addEventListener('click', event => {
+    const asset = event.target.closest?.('.asset');
+    if (asset) selectedName = asset.querySelector('.asset-name')?.textContent?.trim() || selectedName;
+  }, true);
 
   const $ = selector => document.querySelector(selector);
   const fmt = seconds => {
@@ -28,14 +33,7 @@
   };
 
   function selectedFile() {
-    const active = $('.asset.active');
-    const name = active?.querySelector('.asset-name')?.textContent?.trim();
-    if (name && filesByName.has(name)) return filesByName.get(name);
-    const preview = $('#previewVideo');
-    const source = preview?.currentSrc || preview?.src || '';
-    for (const file of filesByName.values()) {
-      if (source && file.name === name) return file;
-    }
+    if (selectedName && filesByName.has(selectedName)) return filesByName.get(selectedName);
     return filesByName.values().next().value || null;
   }
 
