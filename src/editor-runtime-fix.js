@@ -49,25 +49,39 @@ import { toBlobURL } from '@ffmpeg/util';
     const a=assets().find(x=>x.id===c.assetId)||assets()[0]; if(!a)return;
     const same=v.src===a.url || v.currentSrc===a.url;
     if(!same){v.src=a.url;v.load();}
-    const ready=()=>{
-      try{v.currentTime=Math.min(Math.max(0,Number(c.start)||0),Math.max(0,(v.duration||c.end||1)-.05));}catch(_){ }
-      v.style.display='block'; v.style.visibility='visible'; v.style.opacity='1';
-      v.play().catch(()=>{});
-    };
+    const ready=()=>{try{v.currentTime=Math.min(Math.max(0,Number(c.start)||0),Math.max(0,(v.duration||c.end||1)-.05));}catch(_){ }v.style.display='block';v.style.visibility='visible';v.style.opacity='1';v.play().catch(()=>{});};
     if(v.readyState>=1) ready(); else v.addEventListener('loadedmetadata',ready,{once:true});
   }
 
+  let ffmpegPromise=null;
   async function getFFmpeg(){
     const en=engine(); if(en?.ffmpegReady&&en.ffmpeg)return en.ffmpeg;
-    const ff=new FFmpeg();
-    ff.on('log',x=>console.debug('[FFmpeg]',x.message));
-    const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js';
-    const wasm='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm';
-    const worker='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js';
-    status('Loading video renderer…','busy');
-    await ff.load({coreURL:await toBlobURL(core,'text/javascript'),wasmURL:await toBlobURL(wasm,'application/wasm'),classWorkerURL:await toBlobURL(worker,'text/javascript')});
-    if(en){en.ffmpeg=ff;en.ffmpegReady=true;}
-    return ff;
+    if(ffmpegPromise)return ffmpegPromise;
+    ffmpegPromise=(async()=>{
+      const ff=new FFmpeg();
+      ff.on('log',x=>console.debug('[FFmpeg]',x.message));
+      const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js';
+      const wasm='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm';
+      const worker='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js';
+      status('Loading video renderer…','busy');
+      const [coreURL,wasmURL,workerURL]=await Promise.all([
+        toBlobURL(core,'text/javascript'),
+        toBlobURL(wasm,'application/wasm'),
+        toBlobURL(worker,'text/javascript')
+      ]);
+      await ff.load({coreURL,wasmURL,classWorkerURL:workerURL});
+      if(en){en.ffmpeg=ff;en.ffmpegReady=true;}
+      return ff;
+    })().catch(e=>{ffmpegPromise=null;throw e});
+    return ffmpegPromise;
+  }
+
+  // Warm the renderer in the background after the editor is ready. This removes
+  // the FFmpeg startup download from the user's Render click in most sessions.
+  function warmRenderer(){
+    if(!engine()?.ffmpegReady && !ffmpegPromise){
+      requestIdleCallback?.(()=>getFFmpeg().catch(e=>console.warn('FFmpeg warm-up failed; Render will retry.',e)),{timeout:2500});
+    }
   }
 
   const assTime=t=>{t=Math.max(0,Number(t)||0);return `${Math.floor(t/3600)}:${String(Math.floor(t%3600/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}.${String(Math.floor((t-Math.floor(t))*100)).padStart(2,'0')}`};
@@ -86,16 +100,24 @@ import { toBlobURL } from '@ffmpeg/util';
     try{
       show('Preparing footage',3);
       const list=assets();
+      show(en.ffmpegReady?'Renderer ready':'Starting video renderer…',en.ffmpegReady?6:4);
       const ff=await getFFmpeg();
       const usedIds=[...new Set(en.plan.clips.map(c=>c.assetId))];
       const files=new Map();
-      for(let i=0;i<usedIds.length;i++){
-        const a=list.find(x=>x.id===usedIds[i]); if(!a)continue;
+      // Fetch all source blobs concurrently. This is substantially faster than
+      // downloading four large local object URLs one after another.
+      const loaded=await Promise.all(usedIds.map(async(id,i)=>{
+        const a=list.find(x=>x.id===id); if(!a)return null;
         const ext=(a.name.match(/\.([a-z0-9]+)$/i)?.[1]||'mp4').toLowerCase().replace(/[^a-z0-9]/g,'')||'mp4';
         const file=`input_${i}.${ext}`;
         const res=await fetch(a.url); if(!res.ok)throw new Error(`Unable to read “${a.name}” (${res.status})`);
         const data=new Uint8Array(await res.arrayBuffer()); if(!data.length)throw new Error(`Video “${a.name}” is empty`);
-        await ff.writeFile(file,data); files.set(a.id,file); show(`Loading video ${i+1}/${usedIds.length}`,8+(i+1)/usedIds.length*18);
+        return {id,file,data,name:a.name};
+      }));
+      for(let i=0;i<loaded.length;i++){
+        const x=loaded[i]; if(!x)continue;
+        show(`Preparing video ${i+1}/${loaded.length}`,8+(i+1)/Math.max(1,loaded.length)*18);
+        await ff.writeFile(x.file,x.data); files.set(x.id,x.file);
       }
       if(!files.size)throw new Error('No video files are available to render.');
       const [w,h]=en.plan.aspect==='9:16'?[1080,1920]:en.plan.aspect==='1:1'?[1080,1080]:[1920,1080];
@@ -107,15 +129,15 @@ import { toBlobURL } from '@ffmpeg/util';
       for(let i=1;i<vl.length;i++){const c=en.plan.clips[i],td=Math.min(.8,Math.max(.12,Number(c.transitionDuration)||.35)),off=Math.max(0,elapsed-td),out=`vx${i}`,tr=['fade','fadeblack','fadewhite','wipeleft','wiperight','slideleft','slideright','smoothleft','smoothright','circleopen','circleclose'].includes(c.transition)?c.transition:'fade';filters.push(`${V}[${vl[i]}]xfade=transition=${tr}:duration=${td}:offset=${off}[${out}]`);V=`[${out}]`;elapsed+=Math.max(.08,c.end-c.start)-td}
       filters.push(`${V}null[outv]`);
       const raw='claude-ai-edit.mp4';
-      show('Assembling connected cuts',32);
-      await ff.exec([...args,'-filter_complex',filters.join(';'),'-map','[outv]','-an','-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-movflags','+faststart',raw]);
+      show('Encoding connected edit',32);
+      await ff.exec([...args,'-filter_complex',filters.join(';'),'-map','[outv]','-an','-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-movflags','+faststart',raw]);
       let out=raw;
       if(en.plan.captions && en.plan.clips.some(c=>c.text)){
-        show('Burning subtitles',78);
+        show('Adding subtitles',78);
         await ff.writeFile('captions.ass',new TextEncoder().encode(ass(en.plan,w,h)));
         const cap='claude-ai-captioned.mp4';
         try{
-          await ff.exec(['-i',raw,'-vf','subtitles=captions.ass','-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-an','-movflags','+faststart',cap]);
+          await ff.exec(['-i',raw,'-vf','subtitles=captions.ass','-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-an','-movflags','+faststart',cap]);
           out=cap;
         }catch(captionError){
           console.warn('Caption burn-in unavailable; returning video without burned captions.',captionError);
@@ -128,6 +150,8 @@ import { toBlobURL } from '@ffmpeg/util';
       const v=$('#previewVideo'); if(v){v.src=url;v.load();v.style.display='block';v.style.visibility='visible';v.onloadedmetadata=()=>{v.currentTime=0;v.play().catch(()=>{})};}
       $('#aiDownload')?.remove();
       const dl=document.createElement('button');dl.id='aiDownload';dl.className='btn primary';dl.textContent='Download AI Edit';dl.style.cssText='margin-top:8px;width:100%';dl.onclick=()=>{const a=document.createElement('a');a.href=url;a.download=`claude-ai-${en.plan.aspect.replace(':','x')}.mp4`;a.click()};$('#renderBtn')?.parentElement?.appendChild(dl);
+      // Trigger the download immediately when possible; the observer remains a fallback.
+      try{dl.click()}catch(_){ }
       for(const f of files.values())await ff.deleteFile(f).catch(()=>{}); await ff.deleteFile(raw).catch(()=>{});await ff.deleteFile('captions.ass').catch(()=>{});await ff.deleteFile('claude-ai-captioned.mp4').catch(()=>{});
       show('Render complete',100);status(`Render complete • ${Math.max(0,en.plan.clips.length-1)} transitions`);toast('Render complete — connected cuts and selected aspect ratio are ready.');
       setTimeout(()=>{if(typeof window.__clipForgeRenderLoading==='function')window.__clipForgeRenderLoading('',0,false)},500);
@@ -143,12 +167,11 @@ import { toBlobURL } from '@ffmpeg/util';
       if(e.target?.closest?.('#runAI')){
         let tries=0; const timer=setInterval(()=>{tries++; if(engine()?.plan?.clips?.length){forcePreview();clearInterval(timer)} if(tries>30)clearInterval(timer)},200);
       }
-      if(e.target?.closest?.('#renderBtn')){
-        e.preventDefault();e.stopImmediatePropagation();renderFixed();
-      }
+      if(e.target?.closest?.('#renderBtn')){e.preventDefault();e.stopImmediatePropagation();renderFixed();}
     },true);
-    window.addEventListener('clipforge:transcript',()=>setTimeout(addPresets,50));
+    window.addEventListener('clipforge:transcript',()=>{setTimeout(addPresets,50);setTimeout(warmRenderer,100)});
     setTimeout(addPresets,250);
+    setTimeout(warmRenderer,800);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hook,{once:true});else hook();
 })();
