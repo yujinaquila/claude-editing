@@ -5,22 +5,65 @@ A Vercel-ready, browser-first AI video editor for TikTok, Reels, Shorts and mark
 ## Included
 
 - Premiere-inspired editing workspace
-- AI prompt editor
-- Prompt template dropdown
-- EN / ID UI and AI prompt interpretation
-- Local multilingual Whisper transcription through Transformers.js
+- AI prompt editor and prompt presets
+- EN / ID UI and local deterministic edit planner
+- Multilingual Whisper transcription
 - Auto captions / transcript panel
 - Auto Cut / silence removal
 - Auto Hook
 - Multiple video import
 - AI-assisted scene picker
 - 9:16 / 1:1 / 16:9 output presets
-- FFmpeg.wasm import/export/render
-- Local processing in the browser
+- Interactive preview and timeline
+- Cloud FFmpeg rendering for final exports
+- Connected cuts and transitions
 - SRT subtitle export
-- No API key required
 
-## Run
+## Rendering architecture
+
+Final exports use a dedicated FFmpeg worker instead of Shotstack or FFmpeg.wasm in the browser:
+
+```text
+Browser
+  -> Vercel API
+  -> Cloudflare R2 direct upload
+  -> Cloud FFmpeg worker
+  -> R2 MP4
+  -> Vercel signed download URL
+  -> Browser preview/download
+```
+
+The render worker lives in `render-worker/` and can be deployed as a Docker service on Railway or another container host. Railway can build a service directly from this repository's Dockerfile. Cloudflare R2 provides S3-compatible storage and presigned PUT/GET URLs for browser uploads and downloads.
+
+## Required Vercel environment variables
+
+```text
+R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
+R2_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
+R2_BUCKET=<R2_BUCKET_NAME>
+RENDER_WORKER_URL=https://<YOUR_WORKER_DOMAIN>
+RENDER_WORKER_SECRET=<LONG_RANDOM_SECRET>
+```
+
+## Required render-worker environment variables
+
+```text
+R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
+R2_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
+R2_BUCKET=<R2_BUCKET_NAME>
+RENDER_WORKER_SECRET=<SAME_LONG_RANDOM_SECRET>
+PORT=8080
+```
+
+Create the R2 API token with object read/write access scoped to the render bucket. Configure R2 bucket CORS to allow the deployed editor origin to use presigned PUT/GET requests.
+
+## Deploy the worker
+
+Create a Railway service from this GitHub repository and set its root directory to `render-worker`, or deploy that directory with the Railway CLI. Railway detects the included Dockerfile and builds the FFmpeg worker image.
+
+## Run the editor locally
 
 ```bash
 npm install
@@ -34,20 +77,9 @@ npm run build
 npm run preview
 ```
 
-Deploy the project to Vercel with the default Vite settings.
+## Notes
 
-## AI model
-
-The transcription engine uses `Xenova/whisper-small`, an Apache-2.0 ONNX conversion of OpenAI Whisper, through Hugging Face Transformers.js.
-
-The model is downloaded/cached by the browser on first use. It is multilingual and can process Indonesian and English. WebGPU is attempted first with a WASM fallback.
-
-The editor's natural-language edit planner is intentionally local and deterministic: prompts are translated into an edit plan without requiring a paid LLM API. This makes the project deployable without secrets. The local AI model is Whisper Small (Apache-2.0) for multilingual speech recognition; the edit planner is not presented as a separately trained LLM.
-
-## FFmpeg CORS fix
-
-The FFmpeg class worker is self-hosted at `/ffmpeg/worker.js` (with its local `const.js` and `errors.js` dependencies). The FFmpeg core/WASM can still be fetched from the CDN. This avoids the browser error where `worker.js` is constructed from a different origin than the Vercel app. The setup follows the FFmpeg.wasm 0.12 worker architecture.
-
-## Important
-
-Browser video rendering is CPU/GPU intensive. Large videos and long projects can take significant time and memory. For production-scale server rendering, move the render worker to a dedicated compute service rather than Vercel Functions.
+- Vercel is the control/API layer; it does not run long FFmpeg jobs.
+- R2 handles large source/output files so videos do not pass through Vercel request bodies.
+- The worker keeps job state in memory for the MVP. For multi-worker scaling, move job state/queueing to Redis or a database.
+- The browser FFmpeg implementation remains available as legacy/fallback code, but the Render button now targets the cloud worker.
