@@ -8,7 +8,7 @@
   function toast(message) {
     const el = $('#toast'); if (!el) return;
     el.textContent = message; el.classList.add('show'); clearTimeout(toast.t);
-    toast.t = setTimeout(() => el.classList.remove('show'), 4500);
+    toast.t = setTimeout(() => el.classList.remove('show'), 6000);
   }
   function status(message, kind = 'busy') {
     const text = $('#statusText'), dot = $('#statusDot');
@@ -32,7 +32,12 @@
     return result;
   }
   async function api(body) {
-    const res = await fetch('/api/cloud-render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    let res;
+    try {
+      res = await fetch('/api/cloud-render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch (error) {
+      throw new Error(`Cannot reach the cloud render API. Check the deployed Vercel site and network connection. ${error?.message || 'Network error'}`);
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Cloud render request failed (${res.status})`);
     return data;
@@ -41,11 +46,19 @@
     loading(true, `Uploading video ${index}/${total} to cloud…`, 5 + ((index - 1) / total) * 30);
     const ticket = await api({ action: 'upload-url', filename: file.name, contentType: file.type || 'video/mp4' });
     if (!ticket.id || !ticket.url) throw new Error(`Could not create a cloud upload for “${file.name}”.`);
-    const put = await fetch(ticket.url, { method: 'PUT', headers: { 'Content-Type': file.type || 'video/mp4' }, body: file });
-    if (!put.ok) throw new Error(`Cloud upload failed for “${file.name}” (${put.status}).`);
-    const state = await api({ action: 'source-status', id: ticket.id });
-    if (state.status !== 'ready') throw new Error(`Cloud could not prepare “${file.name}”.`);
-    return { key: ticket.id, url: state.url };
+    let put;
+    try {
+      put = await fetch(ticket.url, { method: 'PUT', headers: { 'Content-Type': file.type || 'video/mp4' }, body: file });
+    } catch (error) {
+      throw new Error(`Cannot reach Cloudflare R2 for “${file.name}”. Check the R2 bucket CORS policy. ${error?.message || 'Network error'}`);
+    }
+    if (!put.ok) throw new Error(`Cloud upload failed for “${file.name}” (${put.status}). Check R2 CORS and API token permissions.`);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const state = await api({ action: 'source-status', id: ticket.id });
+      if (state.status === 'ready') return ticket.id;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    throw new Error(`Cloud could not verify the upload for “${file.name}”.`);
   }
   async function renderCloud() {
     if (busy) return;
@@ -75,7 +88,9 @@
   async function poll(id, plan) {
     clearTimeout(pollTimer);
     for (;;) {
-      const r = await fetch(`/api/cloud-render?id=${encodeURIComponent(id)}`);
+      let r;
+      try { r = await fetch(`/api/cloud-render?id=${encodeURIComponent(id)}`); }
+      catch (error) { throw new Error(`Lost connection while checking the cloud render. ${error?.message || 'Network error'}`); }
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || `Could not check cloud render (${r.status})`);
       const p = Number(data.progress);
