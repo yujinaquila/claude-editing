@@ -7,9 +7,7 @@
   <meta name="description" content="Claude AI Editor — prompt-driven marketing video editor" />
   <title>Claude AI Editor</title>
   <script>
-    // Preview fix: main.js creates the asset Blob URL, then its metadata
-    // helper was revoking that same URL. Keep video File URLs alive until
-    // the page is unloaded so the preview can actually decode/play them.
+    // Keep imported video Blob URLs alive for the editor session.
     (() => {
       const originalCreate = URL.createObjectURL.bind(URL);
       const originalRevoke = URL.revokeObjectURL.bind(URL);
@@ -17,9 +15,7 @@
 
       URL.createObjectURL = (object) => {
         const url = originalCreate(object);
-        if (object instanceof File && /^video\\//i.test(object.type)) {
-          mediaUrls.add(url);
-        }
+        if (object instanceof File && /^video\\//i.test(object.type)) mediaUrls.add(url);
         return url;
       };
 
@@ -32,6 +28,42 @@
         for (const url of mediaUrls) originalRevoke(url);
         mediaUrls.clear();
       });
+    })();
+
+    // Speed fix: the editor's browser transcription used Whisper Small.
+    // For long videos that is unnecessarily heavy on CPU/WASM. Transparently
+    // redirect the Transformers.js model files to the much lighter Whisper
+    // Tiny model. This keeps transcription local/private while dramatically
+    // reducing model download and inference cost. The browser cache still
+    // means the model is downloaded only once per browser profile.
+    (() => {
+      const originalFetch = window.fetch.bind(window);
+      const SMALL = '/onnx-community/whisper-small/';
+      const TINY = '/onnx-community/whisper-tiny/';
+
+      function rewriteUrl(value) {
+        try {
+          const url = new URL(value, location.href);
+          if (url.hostname === 'huggingface.co' && url.pathname.includes(SMALL)) {
+            url.pathname = url.pathname.replace(SMALL, TINY);
+            return url.toString();
+          }
+          return value;
+        } catch (_) {
+          return value;
+        }
+      }
+
+      window.fetch = (input, init) => {
+        if (typeof input === 'string' || input instanceof URL) {
+          return originalFetch(rewriteUrl(input), init);
+        }
+        if (input instanceof Request) {
+          const rewritten = rewriteUrl(input.url);
+          if (rewritten !== input.url) return originalFetch(new Request(rewritten, input), init);
+        }
+        return originalFetch(input, init);
+      };
     })();
   </script>
 </head>
