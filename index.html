@@ -30,17 +30,12 @@
       });
     })();
 
-    // Speed fix: the editor's browser transcription used Whisper Small.
-    // For long videos that is unnecessarily heavy on CPU/WASM. Transparently
-    // redirect the Transformers.js model files to the much lighter Whisper
-    // Tiny model. This keeps transcription local/private while dramatically
-    // reducing model download and inference cost. The browser cache still
-    // means the model is downloaded only once per browser profile.
+    // Speed fix: redirect Whisper Small model requests to the much lighter
+    // Whisper Tiny model while keeping transcription local/private.
     (() => {
       const originalFetch = window.fetch.bind(window);
       const SMALL = '/onnx-community/whisper-small/';
       const TINY = '/onnx-community/whisper-tiny/';
-
       function rewriteUrl(value) {
         try {
           const url = new URL(value, location.href);
@@ -49,21 +44,46 @@
             return url.toString();
           }
           return value;
-        } catch (_) {
-          return value;
-        }
+        } catch (_) { return value; }
       }
-
       window.fetch = (input, init) => {
-        if (typeof input === 'string' || input instanceof URL) {
-          return originalFetch(rewriteUrl(input), init);
-        }
+        if (typeof input === 'string' || input instanceof URL) return originalFetch(rewriteUrl(input), init);
         if (input instanceof Request) {
           const rewritten = rewriteUrl(input.url);
           if (rewritten !== input.url) return originalFetch(new Request(rewritten, input), init);
         }
         return originalFetch(input, init);
       };
+    })();
+
+    // Import compatibility fix. Some browsers/OS combinations give uploaded
+    // video files an empty or generic MIME type. main.js currently filters on
+    // file.type, so normalize the MIME type before its change handler runs.
+    (() => {
+      const MIME = {
+        mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime',
+        webm: 'video/webm', ogv: 'video/ogg', avi: 'video/x-msvideo',
+        mkv: 'video/x-matroska', mpeg: 'video/mpeg', mpg: 'video/mpeg',
+        ts: 'video/mp2t', mts: 'video/mp2t', m2ts: 'video/mp2t'
+      };
+      const extOf = (name) => String(name || '').toLowerCase().split('.').pop();
+      document.addEventListener('change', (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
+        const files = Array.from(input.files || []);
+        if (!files.length) return;
+        const dt = new DataTransfer();
+        let changed = false;
+        for (const file of files) {
+          const ext = extOf(file.name);
+          const mime = MIME[ext];
+          if (mime && (!file.type || !file.type.startsWith('video/'))) {
+            dt.items.add(new File([file], file.name, { type: mime, lastModified: file.lastModified }));
+            changed = true;
+          } else dt.items.add(file);
+        }
+        if (changed) input.files = dt.files;
+      }, true);
     })();
   </script>
 </head>
