@@ -1,0 +1,11 @@
+{
+  "name": "claude-ai-render-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.879.0",
+    "@aws-sdk/s3-request-presigner": "^3.879.0"
+  }
+}
