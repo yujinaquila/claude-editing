@@ -1,7 +1,7 @@
 // Reliable Auto Cut / Auto Hook controls.
-// main.js keeps its editor state private, so these controls read the rendered
-// transcript as the source of truth. This prevents a valid transcript from
-// being treated as "missing" after UI state changes.
+// Cloud transcription is the source of truth when available. The controls
+// also fall back to the rendered transcript so UI state changes cannot make a
+// valid cloud transcript look missing.
 
 (() => {
   const $ = (selector) => document.querySelector(selector);
@@ -14,7 +14,18 @@
     return NaN;
   };
 
-  function readTranscript() {
+  function normalizeTranscript(items) {
+    return (Array.isArray(items) ? items : [])
+      .map((item) => ({
+        start: Number(item?.start),
+        end: Number(item?.end),
+        text: String(item?.text || '').trim()
+      }))
+      .filter((item) => item.text && Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start)
+      .sort((a, b) => a.start - b.start);
+  }
+
+  function readRenderedTranscript() {
     return [...document.querySelectorAll('#transcript .segment')]
       .map((el) => {
         const stamp = el.querySelector('.stamp')?.textContent || '';
@@ -27,6 +38,14 @@
         return { start, end, text };
       })
       .filter(Boolean);
+  }
+
+  function readTranscript() {
+    // Cloud Transcribe stores its completed result here. Prefer it because
+    // main.js may re-render #transcript when selecting an asset or timeline.
+    const cloud = normalizeTranscript(window.__clipForgeCloudTranscript);
+    if (cloud.length) return cloud;
+    return normalizeTranscript(readRenderedTranscript());
   }
 
   function notify(message) {
@@ -82,6 +101,9 @@
     const video = getVideo();
     if (!lane || !video || !cuts.length) return;
 
+    // Keep the generated edit available to other editor code.
+    window.__clipForgeAutoCuts = cuts.map((cut) => ({ ...cut }));
+
     const duration = Number(video.duration) || cuts[cuts.length - 1].end || 1;
     lane.innerHTML = cuts.map((cut, index) => {
       const left = Math.max(0, Math.min(100, cut.start / duration * 100));
@@ -115,13 +137,10 @@
 
     const transcript = readTranscript();
 
-    // If the transcript is rendered, it is valid even if main.js's private
-    // state was reset. Consume the rendered transcript instead of showing the
-    // stale "Transcribe first" message.
+    // A cloud transcript is valid even when main.js's private transcript was
+    // reset. Consume it here before main.js can show the stale error.
     if (!transcript.length) return;
 
-    // Run before main.js's bubbling click handler so its stale state check
-    // cannot override the correct result.
     event.preventDefault();
     event.stopImmediatePropagation();
 
@@ -148,6 +167,5 @@
     notify(`Auto Cut found ${cuts.length} spoken regions.`);
   }
 
-  // Capture phase guarantees this runs before main.js's normal button handler.
   document.addEventListener('click', handleClick, true);
 })();
