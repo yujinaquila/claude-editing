@@ -23,23 +23,19 @@ const R2 = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || ''
   }
 });
-const worker = process.env.RENDER_WORKER_URL;
-const workerSecret = process.env.RENDER_WORKER_SECRET;
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
   return res.end(JSON.stringify(body));
 }
 
-function assertConfig({ requireWorker = true } = {}) {
+function assertConfig() {
   const missing = [];
   if (!r2Config.endpoint) missing.push('R2_ENDPOINT');
   if (!process.env.R2_ACCESS_KEY_ID) missing.push('R2_ACCESS_KEY_ID');
   if (!process.env.R2_SECRET_ACCESS_KEY) missing.push('R2_SECRET_ACCESS_KEY');
   if (!bucket) missing.push('R2_BUCKET');
-  if (requireWorker && !worker) missing.push('RENDER_WORKER_URL');
-  if (requireWorker && !workerSecret) missing.push('RENDER_WORKER_SECRET');
-  if (missing.length) throw new Error(`Cloud rendering is not configured. Missing: ${missing.join(', ')}`);
+  if (missing.length) throw new Error(`Bucket storage is not configured. Missing: ${missing.join(', ')}`);
 }
 
 function cleanName(name) {
@@ -67,84 +63,39 @@ async function objectExists(key) {
   }
 }
 
-async function workerFetch(path, init = {}) {
-  if (!worker) throw new Error('RENDER_WORKER_URL is not configured in Vercel. Deploy the FFmpeg worker and add its URL first.');
-  if (!workerSecret) throw new Error('RENDER_WORKER_SECRET is not configured in Vercel.');
-  let response;
-  try {
-    response = await fetch(`${worker.replace(/\/$/, '')}${path}`, {
-      ...init,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'x-render-worker-secret': workerSecret,
-        ...(init.headers || {})
-      }
-    });
-  } catch (error) {
-    throw new Error(`Cannot reach the cloud FFmpeg worker. Check RENDER_WORKER_URL and make sure the worker is online. ${error?.message || ''}`.trim());
-  }
-  const text = await response.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = { error: text }; }
-  if (!response.ok) {
-    const detail = data?.error || data?.message || text || 'No error body returned by worker';
-    const error = new Error(`Render worker request failed (${response.status}): ${detail}`);
-    error.status = response.status;
-    throw error;
-  }
-  return data;
-}
-
 export default async function handler(req, res) {
-  if (!['POST', 'GET'].includes(req.method)) return json(res, 405, { error: 'Method not allowed' });
+  if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
   try {
-    assertConfig({ requireWorker: req.method === 'GET' || req.body?.action === 'render' });
+    assertConfig();
+    const body = req.body || {};
 
-    if (req.method === 'POST') {
-      const body = req.body || {};
-
-      if (body.action === 'upload-url') {
-        const id = `${Date.now()}-${crypto.randomUUID()}`;
-        const key = `uploads/${id}-${cleanName(body.filename)}`;
-        const url = await signPut(key, body.contentType || 'video/mp4');
-        return json(res, 200, { id: key, url, expires: 3600 });
-      }
-
-      if (body.action === 'source-status') {
-        if (!body.id) return json(res, 400, { error: 'Missing source id.' });
-        if (!String(body.id).startsWith('uploads/')) return json(res, 400, { error: 'Invalid source id.' });
-        const ready = await objectExists(body.id);
-        if (!ready) return json(res, 404, { id: body.id, status: 'uploading' });
-        const url = await signGet(body.id, 86400);
-        return json(res, 200, { id: body.id, status: 'ready', url });
-      }
-
-      if (body.action === 'render') {
-        if (!body.plan?.clips?.length) return json(res, 400, { error: 'The edit plan has no clips.' });
-        const sources = {};
-        for (const [assetId, value] of Object.entries(body.sources || {})) {
-          const key = typeof value === 'string' ? value : value?.key;
-          if (!key || !String(key).startsWith('uploads/')) continue;
-          if (!(await objectExists(key))) return json(res, 404, { error: `Cloud source is not uploaded yet: ${key}` });
-          sources[assetId] = { key, url: await signGet(key, 86400) };
-        }
-        if (!Object.keys(sources).length) return json(res, 400, { error: 'No cloud source files were supplied.' });
-        const queued = await workerFetch('/render', {
-          method: 'POST',
-          body: JSON.stringify({ plan: body.plan, sources })
-        });
-        return json(res, 201, queued);
-      }
-
-      return json(res, 400, { error: 'Unknown cloud render action.' });
+    if (body.action === 'upload-url' || body.action === 'render-upload-url') {
+      if (body.action === 'render-upload-url' && !body.filename) return json(res, 400, { error: 'Missing render filename.' });
+      const id = `${Date.now()}-${crypto.randomUUID()}`;
+      const prefix = body.action === 'render-upload-url' ? 'renders' : 'uploads';
+      const key = `${prefix}/${id}-${cleanName(body.filename || 'video.mp4')}`;
+      const url = await signPut(key, body.contentType || 'video/mp4');
+      return json(res, 200, { id: key, key, url, expires: 3600 });
     }
 
-    const id = req.query?.id;
-    if (!id) return json(res, 400, { error: 'Missing render id.' });
-    return json(res, 200, await workerFetch(`/render/${encodeURIComponent(id)}`));
+    if (body.action === 'source-status') {
+      if (!body.id) return json(res, 400, { error: 'Missing source id.' });
+      if (!String(body.id).startsWith('uploads/')) return json(res, 400, { error: 'Invalid source id.' });
+      const ready = await objectExists(body.id);
+      if (!ready) return json(res, 404, { id: body.id, status: 'uploading' });
+      return json(res, 200, { id: body.id, status: 'ready', url: await signGet(body.id) });
+    }
+
+    if (body.action === 'render-final-url') {
+      const key = String(body.key || '');
+      if (!key.startsWith('renders/')) return json(res, 400, { error: 'Invalid render key.' });
+      if (!(await objectExists(key))) return json(res, 404, { error: 'Rendered video has not finished uploading yet.' });
+      return json(res, 200, { key, url: await signGet(key, 86400) });
+    }
+
+    return json(res, 400, { error: 'Unknown bucket action.' });
   } catch (error) {
-    console.error('[cloud-render]', error);
-    return json(res, error.status || 500, { error: error.message || 'Cloud render request failed.' });
+    console.error('[bucket-storage]', error);
+    return json(res, 500, { error: error.message || 'Bucket storage request failed.' });
   }
 }
