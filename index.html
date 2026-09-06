@@ -249,6 +249,30 @@
 
 /* Phase 3 Professional Timeline */
 .tl-tools{display:flex;gap:6px;align-items:center}.tl-tools button{font-size:11px;padding:5px 8px}.tl-clip.selected{outline:2px solid var(--ai);box-shadow:0 0 0 2px rgba(124,92,255,.22)}.tl-ruler{height:20px;position:relative;min-width:100%;border-bottom:1px solid var(--border);margin-bottom:6px}.tl-tick{position:absolute;top:0;height:100%;border-left:1px solid var(--border);font-size:9px;color:var(--muted);padding-left:3px}.tl-track{cursor:crosshair}.snap-guide{position:absolute;top:0;bottom:0;width:2px;background:var(--ai);pointer-events:none}.zoom-label{font-size:10px;color:var(--muted)}
+
+/* CLIPFORGE AUTO TRANSITIONS */
+.transition-tools{display:inline-flex;align-items:center;gap:6px;margin-left:6px}
+.transition-tools select{height:30px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:0 8px;font-size:11px}
+.transition-auto-btn{height:30px!important;white-space:nowrap}
+.transition-badge{position:absolute;right:4px;top:4px;z-index:5;border:1px solid var(--ai);background:rgba(20,16,45,.92);color:#cfc7ff;border-radius:5px;padding:2px 5px;font-size:8px;font-weight:800;cursor:pointer;backdrop-filter:blur(5px)}
+.transition-badge:hover{background:var(--ai);color:#fff}
+.tl-clip{position:relative}
+#transitionOverlay{position:absolute;inset:0;z-index:20;pointer-events:none;opacity:0;overflow:hidden}
+#transitionOverlay.active{opacity:1}
+#transitionOverlay.flash{background:#fff;animation:cfFlash .42s ease-out}
+#transitionOverlay.blur{background:rgba(20,20,28,.18);backdrop-filter:blur(14px);animation:cfBlur .55s ease-out}
+#transitionOverlay.film{background:repeating-linear-gradient(90deg,rgba(255,255,255,.9) 0 5%,transparent 5% 13%);mix-blend-mode:screen;animation:cfFilm .5s ease-out}
+#transitionOverlay.zoom{background:radial-gradient(circle,transparent 0 35%,rgba(0,0,0,.7) 100%);animation:cfZoom .5s ease-out}
+#transitionOverlay.slide{background:linear-gradient(90deg,rgba(0,0,0,.9),transparent 55%);animation:cfSlide .45s ease-out}
+#transitionOverlay.dissolve{background:rgba(0,0,0,.65);animation:cfDissolve .55s ease-out}
+@keyframes cfFlash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+@keyframes cfBlur{0%{opacity:0;backdrop-filter:blur(0)}35%{opacity:1;backdrop-filter:blur(16px)}100%{opacity:0;backdrop-filter:blur(0)}}
+@keyframes cfFilm{0%{opacity:0;transform:translateX(-100%)}35%{opacity:1}100%{opacity:0;transform:translateX(100%)}}
+@keyframes cfZoom{0%{opacity:0;transform:scale(.72)}40%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.18)}}
+@keyframes cfSlide{0%{opacity:1;transform:translateX(-100%)}100%{opacity:0;transform:translateX(100%)}}
+@keyframes cfDissolve{0%{opacity:0}35%{opacity:.75}100%{opacity:0}}
+@media(max-width:1050px){.transition-tools select{max-width:110px}.transition-auto-btn{font-size:10px!important;padding:5px 7px!important}}
+
 </style>
 </head>
 <body>
@@ -1747,5 +1771,126 @@ renderTimeline();
 </script>
   <script type="module" src="/src/phase4-smart-ai.js"></script>
 <script type="module" src="/src/auth-session-repair.js"></script>
+<!-- CLIPFORGE-AUTO-TRANSITIONS-V1 -->
+<script>
+(function(){
+  const TYPES=['flash','film','blur','zoom','slide','dissolve'];
+  const LABELS={flash:'Flash',film:'Film Strip',blur:'Blur',zoom:'Zoom',slide:'Slide',dissolve:'Dissolve'};
+  let transitionMap={};
+  let transitionEmail='';
+  let lastTransitionAt=0;
+
+  function transitionKey(){
+    const email=(window.user&&window.user.email)||'guest';
+    return 'clipforge_transitions_v1_'+String(email).toLowerCase();
+  }
+  function loadTransitions(){
+    try{transitionMap=JSON.parse(localStorage.getItem(transitionKey())||'{}');}catch(e){transitionMap={};}
+    transitionEmail=(window.user&&window.user.email)||'guest';
+  }
+  function saveTransitions(){
+    try{localStorage.setItem(transitionKey(),JSON.stringify(transitionMap));}catch(e){}
+  }
+  function chooseRandom(prev){
+    const pool=TYPES.filter(x=>x!==prev);
+    return pool[Math.floor(Math.random()*pool.length)]||'flash';
+  }
+  function recommended(i){
+    const a=window.timeline&&window.timeline[i];
+    const b=window.timeline&&window.timeline[i+1];
+    if(!a||!b) return 'dissolve';
+    const ah=(a.highlights||[]).length, bh=(b.highlights||[]).length;
+    const ad=Math.max(.2,(a.trimOut||a.duration)-(a.trimIn||0));
+    const bd=Math.max(.2,(b.trimOut||b.duration)-(b.trimIn||0));
+    if(ah||bh) return (i%2===0?'flash':'zoom');
+    if(Math.min(ad,bd)<2.2) return 'flash';
+    if(Math.max(ad,bd)>8) return 'blur';
+    if(i%5===0) return 'film';
+    if(i%3===0) return 'slide';
+    return 'dissolve';
+  }
+  function applyAuto(mode){
+    if(!window.timeline||window.timeline.length<2){
+      if(window.showToast) showToast(window.currentLang==='id'?'Tambahkan minimal 2 klip dulu':'Add at least 2 clips first');
+      return;
+    }
+    let prev='';
+    for(let i=0;i<timeline.length-1;i++){
+      const type=mode==='random'?chooseRandom(prev):recommended(i);
+      transitionMap[i]=type; prev=type;
+    }
+    saveTransitions();
+    if(window.renderTimeline) window.renderTimeline();
+    if(window.showToast) showToast(mode==='random'
+      ? (window.currentLang==='id'?'Transisi acak diterapkan':'Random transitions applied')
+      : (window.currentLang==='id'?'Transisi rekomendasi diterapkan':'Recommended transitions applied'));
+  }
+  function cycleTransition(i){
+    const cur=transitionMap[i]||recommended(i);
+    const n=TYPES[(TYPES.indexOf(cur)+1)%TYPES.length];
+    transitionMap[i]=n; saveTransitions();
+    if(window.renderTimeline) window.renderTimeline();
+  }
+  function decorateTimeline(){
+    document.querySelectorAll('.tl-clip').forEach((el,i)=>{
+      if(i>=timeline.length-1) return;
+      const type=transitionMap[i]||recommended(i);
+      el.dataset.transition=type;
+      const b=document.createElement('button');
+      b.type='button'; b.className='transition-badge'; b.textContent='↗ '+LABELS[type];
+      b.title='Change transition';
+      b.onclick=function(e){e.preventDefault();e.stopPropagation();cycleTransition(i);};
+      el.appendChild(b);
+    });
+  }
+  function injectControls(){
+    const tools=document.querySelector('.tl-tools');
+    if(!tools||document.getElementById('transitionTools')) return;
+    const wrap=document.createElement('span');
+    wrap.className='transition-tools'; wrap.id='transitionTools';
+    wrap.innerHTML='<select id="transitionMode" title="Transition mode"><option value="recommended">✨ Recommended</option><option value="random">🎲 Random</option></select><button class="btn-ghost transition-auto-btn" id="autoTransitionBtn">Auto Transition</button>';
+    tools.insertBefore(wrap,tools.lastElementChild);
+    document.getElementById('autoTransitionBtn').addEventListener('click',()=>applyAuto(document.getElementById('transitionMode').value));
+  }
+  function showTransition(type){
+    const now=performance.now();
+    if(now-lastTransitionAt<120) return;
+    lastTransitionAt=now;
+    const wrap=document.getElementById('previewWrap');
+    if(!wrap) return;
+    let ov=document.getElementById('transitionOverlay');
+    if(!ov){ov=document.createElement('div');ov.id='transitionOverlay';wrap.appendChild(ov);}
+    ov.className=''; void ov.offsetWidth; ov.className='active '+(type||'dissolve');
+    setTimeout(()=>{if(ov) ov.className='';},700);
+  }
+  function install(){
+    loadTransitions(); injectControls();
+    const originalRender=window.renderTimeline;
+    if(originalRender&&!originalRender.__cfWrapped){
+      const wrapped=function(){const r=originalRender.apply(this,arguments); setTimeout(decorateTimeline,0); return r;};
+      wrapped.__cfWrapped=true; window.renderTimeline=wrapped;
+    }
+    const originalLoad=window.loadSeqClip;
+    if(originalLoad&&!originalLoad.__cfWrapped){
+      const wrappedLoad=function(idx,autoplay,seekWithin){
+        if(window.seq&&window.seq.mode==='sequence'&&idx>window.seq.index){
+          showTransition(transitionMap[idx-1]||recommended(idx-1));
+        }
+        return originalLoad.apply(this,arguments);
+      };
+      wrappedLoad.__cfWrapped=true; window.loadSeqClip=wrappedLoad;
+    }
+    const originalComplete=window.completeLogin;
+    if(originalComplete&&!originalComplete.__cfWrapped){
+      const wrappedLogin=async function(){const r=await originalComplete.apply(this,arguments); loadTransitions(); injectControls(); setTimeout(decorateTimeline,0); return r;};
+      wrappedLogin.__cfWrapped=true; window.completeLogin=wrappedLogin;
+    }
+    setTimeout(()=>{injectControls();decorateTimeline();},250);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install); else install();
+  window.cfAutoTransitions={applyAuto,cycleTransition,showTransition};
+})();
+</script>
+
 </body>
 </html>
