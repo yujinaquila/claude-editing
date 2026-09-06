@@ -1,0 +1,129 @@
+name: Fix AI tools
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch AI tools
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          marker='<!-- CLIPFORGE-AI-TOOLS-FIX-V2 -->'
+          if marker in s:
+              print('already patched')
+              raise SystemExit
+          patch=r'''<!-- CLIPFORGE-AI-TOOLS-FIX-V2 -->
+          <script>
+          (()=>{
+            const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+            const safeName=v=>String(v||'').trim().toLowerCase();
+            function getSources(){
+              if(Array.isArray(media)&&media.length) return media.filter(x=>x&&x.url);
+              if(Array.isArray(timeline)&&timeline.length) return timeline.map(c=>getMediaForTimelineClip(c)||c).filter(x=>x&&x.url);
+              return [];
+            }
+            async function captureFrameReliable(url, ratio=.35){
+              return new Promise(resolve=>{
+                const v=document.createElement('video'); let done=false;
+                const finish=x=>{if(done)return;done=true;try{v.pause();v.removeAttribute('src');v.load();}catch(e){}resolve(x)};
+                const timer=setTimeout(()=>finish(null),12000);
+                v.muted=true;v.playsInline=true;v.preload='metadata';v.src=url;
+                v.onloadedmetadata=()=>{try{v.currentTime=Math.max(.05,Math.min(Math.max(.05,v.duration-.05),v.duration*ratio));}catch(e){finish(null)}};
+                v.onseeked=()=>{clearTimeout(timer);try{const c=document.createElement('canvas');c.width=480;c.height=270;const ctx=c.getContext('2d');ctx.drawImage(v,0,0,c.width,c.height);finish(c.toDataURL('image/jpeg',.78).split(',')[1]);}catch(e){finish(null)}};
+                v.onerror=()=>{clearTimeout(timer);finish(null)};
+              });
+            }
+            function localRank(src,mode){
+              return src.map((m,i)=>{
+                const hs=(m.highlights||[]).reduce((n,h)=>n+Math.max(0,(h.end||0)-(h.start||0)),0);
+                const speech=(m.transcript||[]).length;
+                const dur=Number(m.duration)||0;
+                const score=hs*4+Math.min(12,speech)*.25+(mode==='hook'?(dur?Math.max(0,8-Math.abs(dur-8)):0):Math.min(10,dur));
+                return {clip:m.name,score,reason:mode==='hook'?'Strongest locally detected energy/speech opening.':'Strong detected energy, speech, and usable duration.'};
+              }).sort((a,b)=>b.score-a.score);
+            }
+            async function runVisionFixed(mode){
+              const src=getSources();
+              if(!src.length){showToast(currentLang==='id'?'Impor video dulu':'Import video clips first');return;}
+              showToast(currentLang==='id'?'Menganalisis video…':'Analyzing video…',true);
+              try{
+                const frames=[];
+                for(const m of src.slice(0,8)){const b64=await captureFrameReliable(m.url,.35);if(b64)frames.push({name:m.name,b64});}
+                let json=null;
+                if(frames.length){
+                  const content=[{type:'text',text:(mode==='hook'?'Choose the strongest opening hook frame for a short-form marketing video.':'Rank the strongest scenes for a short-form marketing video.')+' Return ONLY JSON: {"ranking":[{"clip":"exact filename","reason":"brief reason"}],"topPick":"exact filename"}'}];
+                  frames.forEach(f=>{content.push({type:'text',text:'Clip: '+f.name});content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:f.b64}})});
+                  try{json=safeParseJSON(await callClaude(content,900));}catch(e){console.warn('Vision unavailable, using local ranking',e);}
+                }
+                if(!json || !Array.isArray(json.ranking) || !json.ranking.length){const r=localRank(src,mode);json={ranking:r.map(x=>({clip:x.clip,reason:x.reason})),topPick:r[0]?.clip||src[0].name};}
+                renderVisionResult(json,mode);
+              }catch(err){showResultError(err)}finally{hideToast()}
+            }
+            window.runAutoHook=()=>runVisionFixed('hook');
+            window.runSceneChoose=()=>runVisionFixed('scenes');
+
+            async function runPromptFixed(){
+              const input=document.getElementById('promptInput'); const btn=document.getElementById('promptRunBtn');
+              const prompt=(input?.value||'').trim();
+              if(!prompt){showToast(currentLang==='id'?'Tulis prompt dulu':'Write a prompt first');return}
+              const src=getSources();
+              if(!src.length){showToast(currentLang==='id'?'Impor video dulu':'Import video clips first');return}
+              if(btn)btn.disabled=true; showToast(currentLang==='id'?'AI sedang menyusun edit…':'AI is building the edit…',true);
+              try{
+                let json=null;
+                const context=src.map((m,i)=>({index:i,name:m.name,duration:+(Number(m.duration)||0).toFixed(2),highlights:(m.highlights||[]).slice(0,8).map(h=>({start:+h.start.toFixed(2),end:+h.end.toFixed(2)})),transcript:(m.transcript||[]).slice(0,80).map(w=>w.word).join(' ')}));
+                const request=`You are ClipForge AI editing a real timeline. User request: ${prompt}\nAvailable clips: ${JSON.stringify(context)}\nReturn ONLY valid JSON: {"summary":"...","hookLine":"...","captionIdeas":["..."],"order":[clip index numbers],"cuts":[{"clip":0,"start":0,"end":3}],"duration":15}. Use ONLY available clips. For cuts, timestamps must be within each clip duration. If exact cuts are not inferable, omit cuts and provide order.`;
+                try{json=safeParseJSON(await callClaude(request,1400));}catch(e){console.warn('Prompt AI unavailable, using local prompt planner',e);}
+                if(!json || !Array.isArray(json.order)){
+                  const text=prompt.toLowerCase();
+                  const ordered=src.map((m,i)=>({i,m}));
+                  if(/hook|opening|intro/.test(text)) ordered.sort((a,b)=>((b.m.highlights||[]).length)-((a.m.highlights||[]).length));
+                  if(/short|15s|15 sec/.test(text)) ordered.splice(3);
+                  json={summary:'Created a practical edit plan from the imported clips using detected highlights and durations.',hookLine:'Start with the strongest moment.',captionIdeas:[],order:ordered.map(x=>x.i)};
+                }
+                const order=(json.order||[]).map(Number).filter(i=>Number.isInteger(i)&&i>=0&&i<src.length);
+                const orderedSrc=(order.length?order:src.map((_,i)=>i)).map(i=>src[i]);
+                if(!Array.isArray(timeline))timeline=[];
+                const hasTimeline=timeline.length>0;
+                if(hasTimeline){
+                  const reordered=[]; orderedSrc.forEach(m=>{const c=timeline.find(c=>c.mediaId===m.id);if(c&&!reordered.includes(c))reordered.push(c)}); timeline.forEach(c=>{if(!reordered.includes(c))reordered.push(c)}); timeline=reordered; renderTimeline(); }
+                else{
+                  timeline=orderedSrc.map(m=>({id:'t'+(uidCounter++),mediaId:m.id,name:m.name,url:m.url,duration:m.duration,trimIn:0,trimOut:m.duration,highlights:m.highlights||[]}));
+                  renderTimeline();
+                }
+                const el=document.getElementById('resultsBody');clearEmptyRight();const card=document.createElement('div');card.className='result-card';
+                card.innerHTML=`<h4>AI edit plan</h4><div>${escapeHtml(json.summary||'Edit plan created.')}</div>${json.hookLine?`<div style="margin-top:8px"><b>Hook:</b> "${escapeHtml(json.hookLine)}"</div>`:''}${Array.isArray(json.captionIdeas)&&json.captionIdeas.length?`<div style="margin-top:8px"><b>Caption ideas:</b><ul style="margin:4px 0 0 16px;padding:0">${json.captionIdeas.slice(0,5).map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></div>`:''}<div style="margin-top:8px;color:var(--muted);font-size:11px">${orderedSrc.length} clip(s) arranged on the timeline.</div><button class="apply-btn" onclick="playSequence()">▶ Preview edit</button>`;
+                el.prepend(card);showToast(currentLang==='id'?'Edit AI diterapkan ke timeline':'AI edit applied to timeline');
+              }catch(err){showResultError(err)}finally{if(btn)btn.disabled=false;hideToast()}
+            }
+            window.runPromptEdit=runPromptFixed;
+            setTimeout(()=>{
+              if(window.runAutoHook)window.runAutoHook.__cfFixed=true;
+              if(window.runSceneChoose)window.runSceneChoose.__cfFixed=true;
+              if(window.runPromptEdit)window.runPromptEdit.__cfFixed=true;
+            },0);
+          })();
+          </script>
+          '''
+          s=s.replace('</body>',patch+'\n</body>')
+          p.write_text(s)
+          PY
+      - name: Commit patched index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "Fix Auto Hook Best Scenes and Prompt Edit reliability"
+          git push
+      - name: Remove one-shot workflow
+        if: success()
+        run: |
+          git rm .github/workflows/fix-ai-tools.yml
+          git commit -m "Remove one-shot AI tools fix workflow"
+          git push
