@@ -1186,10 +1186,17 @@ async function runAutoTranscript(){
   const log = card.querySelector('#transcriptLog');
   const langWord = currentLang==='id' ? 'indonesian' : 'english';
 
+  const MAX_TRANSCRIBE_SECONDS = 240; // longer clips risk overloading in-browser inference
   for(const m of source){
     const lineId = 'tr_'+m.id;
     log.innerHTML += `<div id="${lineId}" style="margin-bottom:10px"><b>${escapeHtml(m.name)}</b><br><span class="mono" style="color:var(--muted-2)">${currentLang==='id'?'memuat model…':'loading model…'}</span></div>`;
     const lineEl = document.getElementById(lineId);
+    if(m.duration > MAX_TRANSCRIBE_SECONDS){
+      lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br><span style="color:var(--warn)">${currentLang==='id'
+        ? `Dilewati — klip lebih dari ${Math.round(MAX_TRANSCRIBE_SECONDS/60)} menit, berisiko membebani browser.`
+        : `Skipped — clip is over ${Math.round(MAX_TRANSCRIBE_SECONDS/60)} min, which risks overloading the browser.`}</span>`;
+      continue;
+    }
     try{
       const audio = await decodeTo16kMono(m.url);
       lineEl.querySelector('span').textContent = currentLang==='id' ? 'mentranskrip…' : 'transcribing…';
@@ -1210,7 +1217,7 @@ async function runAutoTranscript(){
     }catch(err){
       console.error('Transcription failed for', m.name, err);
       m.transcriptError = true;
-      lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br><span style="color:var(--render)">${currentLang==='id'?'Transkrip gagal di browser ini (perangkat/browser mungkin tidak mendukung).':'Transcription failed in this browser (device/browser may not support it).'}</span>`;
+      lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br><span style="color:var(--render)">${currentLang==='id'?'Transkrip gagal di browser ini: ':'Transcription failed in this browser: '}${escapeHtml(String(err.message||err))}</span>`;
     }
   }
   showToast(currentLang==='id'?'Transkrip selesai — subtitle akan muncul saat diputar':'Transcription done — subtitles will show during playback');
@@ -1610,27 +1617,69 @@ renderTimeline();
   // connection, and word-level timing below is an approximation (Whisper
   // gives per-phrase timestamps; we evenly split each phrase's words across
   // its time span rather than getting true forced-alignment per word).
-  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-  env.allowLocalModels = false;
-  let transcriberPromise = null;
-  function getTranscriber(onProgress){
-    if(!transcriberPromise){
-      transcriberPromise = pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
-        quantized: true,
-        progress_callback: onProgress
-      });
+  //
+  // Hardening notes (this is the part that was crashing):
+  // - onnxruntime-web's multi-threaded WASM backend needs SharedArrayBuffer,
+  //   which requires special cross-origin isolation headers (COOP/COEP) that
+  //   a plain static site doesn't send. Without it, some builds hard-crash
+  //   instead of falling back — so we force single-threaded WASM explicitly.
+  // - The wasm binary path is pinned explicitly rather than auto-detected,
+  //   since path auto-detection can resolve incorrectly when the library is
+  //   loaded as a raw CDN ES module (leading to a 404 on the .wasm file and
+  //   a hard "Aborted()" runtime crash rather than a catchable error).
+  // - A rejected pipeline-creation promise used to get cached forever, so a
+  //   single failed load would make every future click also silently fail.
+  // - Nothing had a timeout, so a stalled download could hang the tab
+  //   indefinitely with no way to recover except reloading the page.
+  let pipelinePromise = null;
+  let importFailed = null;
+
+  async function loadLibrary(){
+    if(importFailed) throw importFailed;
+    try{
+      const mod = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+      mod.env.allowLocalModels = false;
+      mod.env.backends.onnx.wasm.numThreads = 1; // avoid SharedArrayBuffer/threading crash
+      mod.env.backends.onnx.wasm.wasmPaths =
+        'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
+      return mod;
+    }catch(err){
+      importFailed = err;
+      throw err;
     }
-    return transcriberPromise;
+  }
+  function withTimeout(promise, ms, label){
+    return Promise.race([
+      promise,
+      new Promise((_, reject)=>setTimeout(()=>reject(new Error(label+' timed out')), ms))
+    ]);
+  }
+  async function getTranscriber(onProgress){
+    if(!pipelinePromise){
+      pipelinePromise = (async ()=>{
+        const { pipeline } = await loadLibrary();
+        return pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+          quantized: true,
+          progress_callback: onProgress
+        });
+      })();
+      pipelinePromise.catch(()=>{ pipelinePromise = null; }); // don't cache a failure — allow retry
+    }
+    return withTimeout(pipelinePromise, 120000, 'Model download');
   }
   window.__whisperTranscribe = async function(float32Audio, langWord, onProgress){
     const transcriber = await getTranscriber(onProgress);
-    const output = await transcriber(float32Audio, {
-      return_timestamps: true,
-      language: langWord,
-      task: 'transcribe',
-      chunk_length_s: 30,
-      stride_length_s: 5
-    });
+    const output = await withTimeout(
+      transcriber(float32Audio, {
+        return_timestamps: true,
+        language: langWord,
+        task: 'transcribe',
+        chunk_length_s: 30,
+        stride_length_s: 5
+      }),
+      180000,
+      'Transcription'
+    );
     return output;
   };
 </script>
