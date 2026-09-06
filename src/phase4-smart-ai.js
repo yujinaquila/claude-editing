@@ -2,17 +2,24 @@
 (() => {
   const api = window.ClipForgeSmartAI = window.ClipForgeSmartAI || {};
 
-  // Bridge the editor's top-level lexical state into the module world.
-  const bridge = (name, expression) => {
+  // Bridge the editor's state into the module world safely.
+  const bridge = (name) => {
     if (Object.prototype.hasOwnProperty.call(window, name)) return;
-    Object.defineProperty(window, name, {
-      configurable: true,
-      get() { try { return window.eval(expression); } catch { return undefined; } }
-    });
+    try {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        get() {
+          if (name === 'media') return window.getMedia ? window.getMedia() : [];
+          if (name === 'timeline') return window.getTimeline ? window.getTimeline() : [];
+          if (name === 'seq') return window.getSeq ? window.getSeq() : null;
+          return undefined;
+        }
+      });
+    } catch (_) {}
   };
-  bridge('media', 'media');
-  bridge('timeline', 'timeline');
-  bridge('seq', 'seq');
+  bridge('media');
+  bridge('timeline');
+  bridge('seq');
 
   // Phase 5 needs genuine word timestamps. The original inline helper
   // interpolated words across segment timestamps; replace that global helper

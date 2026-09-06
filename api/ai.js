@@ -65,27 +65,45 @@ Input:\n${JSON.stringify(body)}`;
       parts.push({ text: fallbackPrompt });
     }
 
-    // 1. Primary: Gemini API
+    // 1. Primary: Gemini API with resilient model fallback
     if (ai) {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: { parts }
-      });
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+      let response = null;
+      let lastErr = null;
 
-      const text = response.text || '';
-      let parsed = null;
-      try {
-        const clean = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```$/, '').trim();
-        parsed = JSON.parse(clean);
-      } catch {
-        // text is returned as-is
+      for (const model of modelsToTry) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: { parts }
+          });
+          if (response && response.text) break;
+        } catch (mErr) {
+          lastErr = mErr;
+          console.warn(`Gemini model ${model} unavailable (${mErr?.status || mErr?.message}), trying next...`);
+        }
       }
 
-      return res.status(200).json({
-        text,
-        result: parsed || text,
-        ...(parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {})
-      });
+      if (!response && lastErr && !anthropicKey) {
+        throw lastErr;
+      }
+
+      if (response) {
+        const text = response.text || '';
+        let parsed = null;
+        try {
+          const clean = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```$/, '').trim();
+          parsed = JSON.parse(clean);
+        } catch {
+          // text is returned as-is
+        }
+
+        return res.status(200).json({
+          text,
+          result: parsed || text,
+          ...(parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {})
+        });
+      }
     }
 
     // 2. Fallback: Anthropic if Gemini key is missing

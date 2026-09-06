@@ -43,26 +43,36 @@ export default async function handler(req, res) {
     if (!audio.length) return res.status(400).json({ error: 'Empty audio' });
     const lang = req.headers['x-language'];
 
-    // 1. Primary: Gemini Transcription
+    // 1. Primary: Gemini Transcription with fallback
     if (ai) {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.5-transcribe',
-          contents: {
-            parts: [
-              {
-                inlineData: {
-                  mimeType: 'audio/wav',
-                  data: audio.toString('base64'),
-                },
-              },
-              {
-                text: `Transcribe this audio cleanly. Language: ${lang || 'auto'}.`,
-              },
-            ],
-          },
-        });
+      let response = null;
+      const transcribeModels = ['gemini-3.5-transcribe', 'gemini-3.1-flash-lite'];
 
+      for (const model of transcribeModels) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'audio/wav',
+                    data: audio.toString('base64'),
+                  },
+                },
+                {
+                  text: `Transcribe this audio cleanly. Return only the spoken words, no filler commentary. Language: ${lang || 'auto'}.`,
+                },
+              ],
+            },
+          });
+          if (response) break;
+        } catch (mErr) {
+          console.warn(`Transcribe model ${model} failed, trying next:`, mErr?.message);
+        }
+      }
+
+      if (response) {
         const transcriptText = response.text ? response.text.trim() : '';
         const rawWords = transcriptText ? transcriptText.split(/\s+/).filter(Boolean) : [];
         // 16kHz 16-bit mono PCM = 32000 bytes per second
@@ -89,11 +99,6 @@ export default async function handler(req, res) {
           segments,
           words,
         });
-      } catch (geminiErr) {
-        console.warn('Gemini transcribe failed, attempting fallback if available:', geminiErr?.message);
-        if (!groqKey) {
-          throw geminiErr;
-        }
       }
     }
 
