@@ -7,7 +7,8 @@
     if (Object.prototype.hasOwnProperty.call(window, name)) return;
     Object.defineProperty(window, name, {
       configurable: true,
-      get() { try { return window.eval(expression); } catch { return undefined; } }
+      get() { try { return window.eval(expression); } catch { return undefined; } },
+      set(value) { try { window.__clipforgeBridgeValue = value; window.eval(`${name} = window.__clipforgeBridgeValue`); delete window.__clipforgeBridgeValue; } catch {} }
     });
   };
   bridge('media', 'media');
