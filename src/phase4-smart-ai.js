@@ -4,6 +4,21 @@
  */
 (() => {
   const api = window.ClipForgeSmartAI = window.ClipForgeSmartAI || {};
+
+  // index.html keeps editor state in top-level lexical bindings. Expose read-only
+  // bridges so the module-based Phase 5 studio can consume the live timeline,
+  // media bin, and sequence clock without duplicating editor state.
+  const bridge = (name, expression) => {
+    if (Object.prototype.hasOwnProperty.call(window, name)) return;
+    Object.defineProperty(window, name, {
+      configurable: true,
+      get() { try { return window.eval(expression); } catch { return undefined; } }
+    });
+  };
+  bridge('media', 'media');
+  bridge('timeline', 'timeline');
+  bridge('seq', 'seq');
+
   const bind = (name, fallback) => {
     if (typeof api[name] === 'function') return;
     api[name] = async (...args) => {
