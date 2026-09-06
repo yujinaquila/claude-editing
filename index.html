@@ -1022,23 +1022,16 @@ function applyTemplate(){
   if(map[v]) document.getElementById('promptInput').value = map[v];
 }
 
-/* ===================== Claude API helper ===================== */
+/* ===================== Secure AI API helper ===================== */
 async function callClaude(content, maxTokens){
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: maxTokens || 1000,
-      messages: [{ role:"user", content }]
-    })
+  const response = await fetch('/api/ai', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({content, maxTokens:maxTokens||1200, language:currentLang})
   });
-  const data = await response.json();
-  if(data.error){ throw new Error(data.error.message || 'Claude API error'); }
-  const text = (data.content||[])
-    .filter(b=>b.type==='text')
-    .map(b=>b.text).join('\n');
-  return text;
+  const raw = await response.text();
+  let data={}; try{ data=JSON.parse(raw); }catch(e){}
+  if(!response.ok) throw new Error(data.error || raw || 'AI service unavailable');
+  return data.text || '';
 }
 
 function clipNames(){
@@ -1387,69 +1380,95 @@ function renderVisionResult(json, mode){
   });
 }
 
-/* ---- Auto-Edit All: combine N imported clips into ONE edited sequence ---- */
+/* ---- Phase 2: Smart Auto-Edit All ---- */
+function transcriptWindows(m){
+  const words=m.transcript||[]; if(!words.length) return [];
+  const out=[]; let i=0;
+  while(i<words.length){
+    const start=words[i].start; let j=i;
+    while(j+1<words.length && words[j+1].end-start<4.5) j++;
+    const end=words[j].end;
+    const text=words.slice(i,j+1).map(w=>w.word).join(' ');
+    out.push({start,end,text}); i=j+1;
+  }
+  return out;
+}
+function scoreMoment(m, start, end){
+  const dur=Math.max(.2,end-start);
+  const highlights=(m.highlights||[]).reduce((n,h)=>n+Math.max(0,Math.min(end,h.end)-Math.max(start,h.start)),0);
+  const silence=(m.silences||[]).reduce((n,h)=>n+Math.max(0,Math.min(end,h.end)-Math.max(start,h.start)),0);
+  const transcript=(m.transcript||[]).filter(w=>w.start<end&&w.end>start).length;
+  const energy=Math.min(1,highlights/dur);
+  const speech=Math.min(1,transcript/Math.max(3,dur*1.5));
+  const quiet=Math.min(1,silence/dur);
+  const freshness=Math.min(1,Math.max(0,dur-1)/5);
+  return energy*.42+speech*.38+freshness*.12-quiet*.35;
+}
+function buildCandidateMoments(m){
+  const windows=[];
+  (m.highlights||[]).forEach(h=>{
+    const s=Math.max(0,h.start-.5),e=Math.min(m.duration,h.end+1.2);
+    if(e-s>=1) windows.push({start:s,end:e,reason:'energy'});
+  });
+  transcriptWindows(m).forEach(w=>windows.push({start:w.start,end:w.end,reason:'speech',text:w.text}));
+  if(!windows.length){
+    const step=Math.min(4,Math.max(2,m.duration/3));
+    for(let s=0;s<m.duration;s+=step) windows.push({start:s,end:Math.min(m.duration,s+step),reason:'coverage'});
+  }
+  return windows.map(w=>({...w,clip:m.name,mediaId:m.id,score:scoreMoment(m,w.start,w.end)}))
+    .filter(w=>w.end-w.start>=.8).sort((a,b)=>b.score-a.score);
+}
+function normalizeEditPlan(entries,targetMax=30){
+  const used=[]; let total=0;
+  for(const e of entries){
+    const dur=e.end-e.start; if(total>=targetMax) break;
+    const take=Math.min(dur,targetMax-total);
+    if(take>=.8){ used.push({...e,end:e.start+take}); total+=take; }
+  }
+  return used;
+}
 async function runAutoEditAll(){
-  if(media.length < 1){ showToast(currentLang==='id'?'Impor beberapa klip dulu':'Import some clips first'); return; }
-  showToast(currentLang==='id'?`Menganalisis ${media.length} klip…`:`Analyzing ${media.length} clip(s)…`, true);
+  if(media.length<1){showToast(currentLang==='id'?'Impor klip dulu':'Import clips first');return;}
+  showToast(currentLang==='id'?`Smart AI menganalisis ${media.length} klip…`:`Smart AI is analyzing ${media.length} clips…`,true);
   try{
-    // 1. make sure every clip has real energy/highlight data (reuses cached results if Auto Cut already ran)
-    for(const m of media){
-      if(!m.highlights){
-        try{ const a = await analyzeClipEnergy(m.url); m.highlights = a.highlights; m.silences = a.silences; }
-        catch(e){ m.highlights = []; }
+    const candidates=[];
+    for(let idx=0;idx<media.length;idx++){
+      const m=media[idx];
+      if(!m.highlights || !m.silences){
+        try{const a=await analyzeClipEnergy(m.url);m.highlights=a.highlights;m.silences=a.silences;}catch(e){m.highlights=[];m.silences=[];}
       }
+      candidates.push(...buildCandidateMoments(m).slice(0,8));
     }
-    // 2. grab one representative frame per clip for visual context
-    const frames = [];
-    for(const m of media.slice(0,8)){
-      const b64 = await captureFrameFromUrl(m.url, 0.4);
-      if(b64) frames.push({name:m.name, b64});
+    candidates.sort((a,b)=>b.score-a.score);
+    // Keep the strongest first moment as the hook, then diversify clips so 4 videos can all contribute.
+    const chosen=[]; const perClip=new Map();
+    for(const c of candidates){
+      const count=perClip.get(c.mediaId)||0;
+      const overlaps=chosen.some(x=>x.mediaId===c.mediaId && Math.max(x.start,c.start)<Math.min(x.end,c.end));
+      if(count<3 && !overlaps){chosen.push(c);perClip.set(c.mediaId,count+1);}
+      if(chosen.length>=Math.min(12,media.length*3)) break;
     }
-    const clipInfo = media.map(m=>({
-      name: m.name,
-      duration: +m.duration.toFixed(1),
-      highlightWindows: (m.highlights||[]).slice(0,4).map(h=>`${h.start.toFixed(1)}-${h.end.toFixed(1)}`)
-    }));
-    const content = [{type:"text", text:
-`You're editing ${media.length} separate raw video clips into ONE cohesive short marketing video (TikTok/Reels/Instagram style) — pulling the best moments across ALL of them rather than using any single clip in full.
-
-Clip data, from real audio analysis (name, duration in seconds, detected high-energy "highlight" windows in seconds — prefer these over guessing): ${JSON.stringify(clipInfo)}
-
-Build one edit decision list using ONLY sub-ranges within each clip's own stated duration (never invent a range beyond a clip's duration). Prefer the given highlight windows where sensible. Order for the strongest opening hook first. Target a total length around 15-30 seconds.
-
-Respond ONLY as JSON, no markdown fences, no preamble, exactly this shape:
-{"summary":"one sentence in ${currentLang==='id'?'Indonesian':'English'} explaining the edit","timeline":[{"clip":"exact clip name from the list above","start":0.0,"end":3.0}, ...]}`
-    }];
-    frames.forEach(f=>{
-      content.push({type:"text", text:`Clip: ${f.name}`});
-      content.push({type:"image", source:{type:"base64", media_type:"image/jpeg", data:f.b64}});
-    });
-    const text = await callClaude(content, 1500);
-    const json = safeParseJSON(text);
-    if(!json.timeline || !json.timeline.length) throw new Error(currentLang==='id' ? 'AI tidak mengembalikan rencana edit yang bisa dipakai' : 'AI did not return a usable edit plan');
-
-    timeline = [];
-    json.timeline.forEach(entry=>{
-      const m = media.find(x=>x.name===entry.clip);
-      if(!m) return;
-      const s = Math.max(0, Math.min(Number(entry.start)||0, m.duration));
-      const e = Math.max(s+0.2, Math.min(Number(entry.end)||m.duration, m.duration));
-      timeline.push({id:'t'+(uidCounter++), mediaId:m.id, name:m.name, url:m.url,
-        duration:m.duration, trimIn:s, trimOut:e, highlights:(m.highlights||[])});
-    });
+    // Optional AI pass improves story order using only real candidate ranges.
+    let plan=normalizeEditPlan(chosen,28);
+    try{
+      const compact=chosen.slice(0,12).map((c,i)=>({id:i,clip:c.clip,start:+c.start.toFixed(2),end:+c.end.toFixed(2),score:+c.score.toFixed(2),text:c.text||''}));
+      const prompt=`You are a professional short-form video editor. Build a cohesive 15-30 second edit from ONLY these verified candidate moments. Put the strongest hook first, then vary source clips, avoid duplicate/overlapping moments. Return ONLY JSON: {"summary":"...","order":[candidate id,...]}. Candidates: ${JSON.stringify(compact)}`;
+      const ai=safeParseJSON(await callClaude(prompt,900));
+      if(Array.isArray(ai.order)&&ai.order.length){
+        const ordered=[]; ai.order.forEach(id=>{const c=compact.find(x=>x.id===Number(id));if(c) ordered.push({...chosen[c.id]});});
+        if(ordered.length) {plan=normalizeEditPlan(ordered,28); plan.summary=ai.summary;}
+      }
+    }catch(aiErr){ console.warn('AI ordering unavailable; deterministic smart edit used',aiErr); }
+    if(!plan.length) throw new Error(currentLang==='id'?'Tidak ditemukan momen yang bisa diedit':'No usable moments found');
+    timeline=plan.map(e=>{const m=media.find(x=>x.id===e.mediaId);return {id:'t'+(uidCounter++),mediaId:m.id,name:m.name,url:m.url,duration:m.duration,trimIn:e.start,trimOut:e.end,highlights:m.highlights||[]};});
     renderTimeline();
-
-    const el = document.getElementById('resultsBody');
-    clearEmptyRight();
-    const card = document.createElement('div');
-    card.className = 'result-card';
-    card.innerHTML = `<h4>${currentLang==='id'?'Auto-Edit Semua Klip':'Auto-Edit All Clips'}</h4>
-      <div>${escapeHtml(json.summary||'')}</div>
-      <div style="margin-top:8px;font-size:11.5px;color:var(--muted)">${json.timeline.map(e=>`${escapeHtml(e.clip)} — ${(+e.start).toFixed(1)}s–${(+e.end).toFixed(1)}s`).join('<br>')}</div>`;
+    const total=timeline.reduce((n,c)=>n+c.trimOut-c.trimIn,0);
+    const el=document.getElementById('resultsBody');clearEmptyRight();
+    const card=document.createElement('div');card.className='result-card';
+    card.innerHTML=`<h4>${currentLang==='id'?'Smart Auto-Edit':'Smart Auto-Edit'}</h4><div>${escapeHtml(plan.summary|| (currentLang==='id'?'Momen terbaik dipilih dari semua video berdasarkan energi, ucapan, dan tempo.':'Best moments selected across all videos using energy, speech and pacing.'))}</div><div style="margin-top:8px;color:var(--muted);font-size:11px">${media.length} source video(s) → ${timeline.length} edit decisions → ${total.toFixed(1)}s final sequence</div><button class="apply-btn" onclick="playSequence()">▶ Preview smart edit</button>`;
     el.prepend(card);
-    showToast(currentLang==='id'?'Timeline dibangun dari semua klip':'Timeline built from all clips');
-  }catch(err){ showResultError(err); }
-  hideToast();
+    showToast(currentLang==='id'?'Smart timeline berhasil dibuat':'Smart timeline created');
+  }catch(err){showResultError(err);}finally{hideToast();}
 }
 
 function showResultError(err){

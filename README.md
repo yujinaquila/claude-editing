@@ -85,3 +85,12 @@ instead of your local server.)
 
 ## Fast Cloud Transcription Upgrade
 Set `GROQ_API_KEY` in Vercel Environment Variables. The editor sends lightweight 16 kHz mono WAV chunks to `/api/transcribe`, which calls Groq Whisper Large V3 Turbo. If cloud transcription is unavailable, the existing local Whisper Tiny path is used as fallback.
+
+
+## Phase 2 — Smart Auto Edit
+This upgrade adds deterministic audio/speech scoring plus an optional secure AI ordering pass. Configure `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) in Vercel for AI ordering. Without it, Smart Auto Edit still builds a timeline from energy, speech and pacing analysis.
+
+Vercel variables:
+- GROQ_API_KEY — fast transcription
+- ANTHROPIC_API_KEY — secure AI planning/ordering
+- ANTHROPIC_MODEL (optional)
