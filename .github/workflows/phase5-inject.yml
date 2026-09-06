@@ -1,0 +1,39 @@
+name: Inject Phase 5 Subtitle Studio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/phase5-subtitle-studio.js'
+
+permissions:
+  contents: write
+
+jobs:
+  inject:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject Phase 5 loader
+        shell: bash
+        run: |
+          set -e
+          if ! grep -q 'src/phase5-subtitle-studio.js' index.html; then
+            python3 - <<'PY'
+from pathlib import Path
+p=Path('index.html')
+s=p.read_text()
+needle='</body>'
+if needle not in s:
+    raise SystemExit('index.html has no </body> marker')
+s=s.replace(needle, '  <script src="/src/phase5-subtitle-studio.js"></script>\n</body>', 1)
+p.write_text(s)
+PY
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add index.html
+            git commit -m 'Phase 5: load Subtitle Studio'
+            git push
+          else
+            echo 'Phase 5 loader already present.'
+          fi
