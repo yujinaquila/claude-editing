@@ -3,8 +3,6 @@ name: Inject Phase 5 Subtitle Studio
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/phase5-subtitle-studio.js'
 
 permissions:
   contents: write
