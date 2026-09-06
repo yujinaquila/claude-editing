@@ -82,3 +82,6 @@ npm run dev
 (Add `http://localhost:3000` to Supabase's Additional Redirect URLs first,
 per step 3 above, or the Google flow will redirect back to production
 instead of your local server.)
+
+## Fast Cloud Transcription Upgrade
+Set `GROQ_API_KEY` in Vercel Environment Variables. The editor sends lightweight 16 kHz mono WAV chunks to `/api/transcribe`, which calls Groq Whisper Large V3 Turbo. If cloud transcription is unavailable, the existing local Whisper Tiny path is used as fallback.

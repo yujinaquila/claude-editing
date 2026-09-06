@@ -1162,67 +1162,54 @@ function expandChunksToWords(chunks){
   return words;
 }
 
+function encodeWav(samples, sampleRate=16000){
+  const pcm = new Int16Array(samples.length);
+  for(let i=0;i<samples.length;i++){ const x=Math.max(-1,Math.min(1,samples[i])); pcm[i]=x<0?x*32768:x*32767; }
+  const buf=new ArrayBuffer(44+pcm.byteLength), v=new DataView(buf), put=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+  put(0,'RIFF');v.setUint32(4,36+pcm.byteLength,true);put(8,'WAVE');put(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sampleRate,true);v.setUint32(28,sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);put(36,'data');v.setUint32(40,pcm.byteLength,true);new Int16Array(buf,44).set(pcm);
+  return new Blob([buf],{type:'audio/wav'});
+}
+async function cloudTranscribe(audio, lang, onProgress){
+  const rate=16000, chunkSec=55, size=chunkSec*rate, total=Math.ceil(audio.length/size), segments=[];
+  for(let i=0;i<total;i++){
+    const blob=encodeWav(audio.slice(i*size,Math.min(audio.length,(i+1)*size)),rate);
+    const r=await fetch('/api/transcribe',{method:'POST',headers:{'Content-Type':'audio/wav','X-Language':lang},body:blob});
+    const raw=await r.text(); if(!r.ok) throw new Error(raw||'Cloud transcription failed');
+    const data=JSON.parse(raw), offset=i*chunkSec;
+    for(const seg of (data.segments||[])){
+      const text=(seg.text||'').trim(); if(!text) continue;
+      const a=Number(seg.start||0)+offset,b=Number(seg.end||0)+offset;
+      const parts=text.split(/\s+/).filter(Boolean), step=Math.max(.05,(b-a)/Math.max(1,parts.length));
+      parts.forEach((word,j)=>segments.push({word,start:a+j*step,end:Math.min(b,a+(j+1)*step)}));
+    }
+    onProgress?.(i+1,total);
+  }
+  return segments;
+}
 async function runAutoTranscript(){
   if(!timeline.length && !media.length){ showToast(currentLang==='id'?'Impor klip dulu':'Import a clip first'); return; }
-  if(!window.__whisperTranscribe){
-    showToast(currentLang==='id'?'Model transkrip belum siap, coba lagi sesaat lagi':'Transcript model isn\'t ready yet — try again in a moment');
-    return;
-  }
-  const source = timeline.length
-    ? [...new Set(timeline.map(getMediaForTimelineClip).filter(Boolean))]
-    : media;
-  if(!source.length){ showToast(currentLang==='id'?'Tidak ada klip':'No clips found'); return; }
-
-  const el = document.getElementById('resultsBody');
-  clearEmptyRight();
-  const card = document.createElement('div');
-  card.className = 'result-card';
-  card.innerHTML = `<h4>${currentLang==='id'?'Transkrip':'Transcript'}<span class="badge">${currentLang==='id'?'BETA':'BETA'}</span></h4>
-    <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">${currentLang==='id'
-      ?'Menjalankan model speech-to-text (Whisper-tiny) langsung di browser kamu. Unduhan model pertama kali bisa beberapa saat.'
-      :'Running a real speech-to-text model (Whisper-tiny) directly in your browser. First-time model download can take a bit.'}</div>
-    <div id="transcriptLog"></div>`;
-  el.prepend(card);
-  const log = card.querySelector('#transcriptLog');
-  const langWord = currentLang==='id' ? 'indonesian' : 'english';
-
-  const MAX_TRANSCRIBE_SECONDS = 240; // longer clips risk overloading in-browser inference
+  const source=timeline.length?[...new Set(timeline.map(getMediaForTimelineClip).filter(Boolean))]:media;
+  if(!source.length){showToast(currentLang==='id'?'Tidak ada klip':'No clips found');return;}
+  const el=document.getElementById('resultsBody');clearEmptyRight();
+  const card=document.createElement('div');card.className='result-card';
+  card.innerHTML=`<h4>${currentLang==='id'?'Transkrip Cepat':'Fast Transcript'}<span class="badge">CLOUD</span></h4><div style="font-size:11.5px;color:var(--muted);margin-bottom:8px">Cloud Whisper first • local Whisper fallback</div><div id="transcriptLog"></div>`;el.prepend(card);
+  const log=card.querySelector('#transcriptLog'), lang=currentLang==='id'?'id':'en';
   for(const m of source){
-    const lineId = 'tr_'+m.id;
-    log.innerHTML += `<div id="${lineId}" style="margin-bottom:10px"><b>${escapeHtml(m.name)}</b><br><span class="mono" style="color:var(--muted-2)">${currentLang==='id'?'memuat model…':'loading model…'}</span></div>`;
-    const lineEl = document.getElementById(lineId);
-    if(m.duration > MAX_TRANSCRIBE_SECONDS){
-      lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br><span style="color:var(--warn)">${currentLang==='id'
-        ? `Dilewati — klip lebih dari ${Math.round(MAX_TRANSCRIBE_SECONDS/60)} menit, berisiko membebani browser.`
-        : `Skipped — clip is over ${Math.round(MAX_TRANSCRIBE_SECONDS/60)} min, which risks overloading the browser.`}</span>`;
-      continue;
-    }
+    const line=document.createElement('div');line.style.marginBottom='10px';line.innerHTML=`<b>${escapeHtml(m.name)}</b><br><span class="mono" style="color:var(--muted-2)">preparing audio…</span>`;log.appendChild(line);
     try{
-      const audio = await decodeTo16kMono(m.url);
-      lineEl.querySelector('span').textContent = currentLang==='id' ? 'mentranskrip…' : 'transcribing…';
-      const result = await window.__whisperTranscribe(audio, langWord, (p)=>{
-        if(p && p.status==='progress' && typeof p.progress==='number'){
-          lineEl.querySelector('span').textContent = (currentLang==='id'?'mengunduh model ':'downloading model ')+Math.round(p.progress)+'%';
-        }
-      });
-      const words = expandChunksToWords(result.chunks);
-      m.transcript = words;
-      if(words.length){
-        lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br>` + words.map(w=>
-          `<span class="mono" style="color:var(--muted-2)">${fmtTime(w.start)}</span> <span contenteditable="true">${escapeHtml(w.word)}</span> `
-        ).join('');
-      } else {
-        lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br><span style="color:var(--muted-2)">${currentLang==='id'?'Tidak ada ucapan terdeteksi.':'No speech detected.'}</span>`;
+      const audio=await decodeTo16kMono(m.url); let words;
+      try{ words=await cloudTranscribe(audio,lang,(n,total)=>line.querySelector('span').textContent=`cloud transcription ${n}/${total}…`); }
+      catch(cloudErr){
+        if(!window.__whisperTranscribe) throw cloudErr;
+        line.querySelector('span').textContent='cloud unavailable — using local fallback…';
+        const result=await window.__whisperTranscribe(audio,currentLang==='id'?'indonesian':'english',()=>{}); words=expandChunksToWords(result.chunks);
       }
-    }catch(err){
-      console.error('Transcription failed for', m.name, err);
-      m.transcriptError = true;
-      lineEl.innerHTML = `<b>${escapeHtml(m.name)}</b><br><span style="color:var(--render)">${currentLang==='id'?'Transkrip gagal di browser ini: ':'Transcription failed in this browser: '}${escapeHtml(String(err.message||err))}</span>`;
-    }
+      m.transcript=words;
+      line.innerHTML=`<b>${escapeHtml(m.name)}</b><br>`+(words.length?words.map(w=>`<span class="mono" style="color:var(--muted-2)">${fmtTime(w.start)}</span> <span contenteditable="true">${escapeHtml(w.word)}</span> `).join(''):`<span style="color:var(--muted-2)">No speech detected.</span>`);
+    }catch(err){console.error(err);line.innerHTML=`<b>${escapeHtml(m.name)}</b><br><span style="color:var(--render)">${escapeHtml(String(err.message||err))}</span>`;}
   }
-  showToast(currentLang==='id'?'Transkrip selesai — subtitle akan muncul saat diputar':'Transcription done — subtitles will show during playback');
+  showToast(currentLang==='id'?'Transkrip selesai':'Transcript complete');
 }
-
 /* ---- live subtitle overlay during playback, and burned captions on export ---- */
 function updateSubtitleOverlay(timelineClip, tInSourceClip){
   const overlay = document.getElementById('subtitleOverlay');
