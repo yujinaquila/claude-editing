@@ -1,0 +1,9 @@
+{
+  "name": "clipforge-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-assisted, prompt-driven marketing video editor (static site, Supabase Auth for Google login)",
+  "scripts": {
+    "dev": "npx serve . -l 3000"
+  }
+}
