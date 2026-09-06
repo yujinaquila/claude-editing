@@ -1,4 +1,4 @@
-/* ClipForge Phase 4 compatibility bridge + Phase 5 loader. */
+/* ClipForge Phase 4 compatibility bridge + Phase 5/6 loaders. */
 (() => {
   const api = window.ClipForgeSmartAI = window.ClipForgeSmartAI || {};
 
@@ -71,6 +71,10 @@
   bind('bestScene', 'runSceneChoose');
 
   import('./phase5-subtitle-studio.js')
-    .then(() => window.dispatchEvent(new CustomEvent('clipforge:phase5-ready')))
-    .catch(err => console.error('[ClipForge Phase 5] Subtitle Studio failed to load', err));
+    .then(() => {
+      window.dispatchEvent(new CustomEvent('clipforge:phase5-ready'));
+      return import('./phase6-cloud-projects.js');
+    })
+    .then(() => window.dispatchEvent(new CustomEvent('clipforge:phase6-ready')))
+    .catch(err => console.error('[ClipForge Phase 5/6] module failed to load', err));
 })();
