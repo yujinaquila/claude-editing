@@ -19,6 +19,8 @@ export default async function handler(req, res) {
     form.append('file', new Blob([audio], { type: 'audio/wav' }), 'audio.wav');
     form.append('model', process.env.GROQ_TRANSCRIPTION_MODEL || 'whisper-large-v3-turbo');
     form.append('response_format', 'verbose_json');
+    form.append('timestamp_granularities[]', 'word');
+    form.append('timestamp_granularities[]', 'segment');
     form.append('temperature', '0');
     const lang = req.headers['x-language'];
     if (lang) form.append('language', String(lang));
