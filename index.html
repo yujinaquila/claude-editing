@@ -246,6 +246,9 @@
   .burn-cc-label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);margin-bottom:14px;cursor:pointer;}
   .progress-bar{height:8px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin:14px 0 8px;}
   .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--ai),var(--render));transition:width .2s;}
+
+/* Phase 3 Professional Timeline */
+.tl-tools{display:flex;gap:6px;align-items:center}.tl-tools button{font-size:11px;padding:5px 8px}.tl-clip.selected{outline:2px solid var(--ai);box-shadow:0 0 0 2px rgba(124,92,255,.22)}.tl-ruler{height:20px;position:relative;min-width:100%;border-bottom:1px solid var(--border);margin-bottom:6px}.tl-tick{position:absolute;top:0;height:100%;border-left:1px solid var(--border);font-size:9px;color:var(--muted);padding-left:3px}.tl-track{cursor:crosshair}.snap-guide{position:absolute;top:0;bottom:0;width:2px;background:var(--ai);pointer-events:none}.zoom-label{font-size:10px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -393,7 +396,15 @@
         <div class="tl-title" data-i18n="timelineTitle">Sequence</div>
         <div class="tl-hint" data-i18n="timelineHint">Drag clips to reorder · drag clip edges to trim</div>
       </div>
-      <button class="btn-ghost" onclick="clearTimeline()" data-i18n="clearBtn">Clear</button>
+      <div class="tl-tools">
+        <button class="btn-ghost" id="splitBtn">✂ Split</button>
+        <button class="btn-ghost" id="dupBtn">Duplicate</button>
+        <button class="btn-ghost" id="deleteBtn">Delete</button>
+        <button class="btn-ghost" id="undoBtn">↶ Undo</button>
+        <button class="btn-ghost" id="redoBtn">↷ Redo</button>
+        <span class="zoom-label">Zoom</span><input id="tlZoom" type="range" min="12" max="80" value="26" style="width:90px">
+        <button class="btn-ghost" onclick="clearTimeline()" data-i18n="clearBtn">Clear</button>
+      </div>
     </div>
     <div id="tlScroll">
       <div class="tl-track-label" data-i18n="videoTrack">Video track</div>
@@ -1688,6 +1699,51 @@ renderTimeline();
     );
     return output;
   };
+</script>
+
+<script>
+/* Phase 3: Professional Timeline controller */
+(() => {
+ let selectedClipId=null, history=[], future=[], zoom=26;
+ const snapSeconds=.25;
+ const clone=v=>JSON.parse(JSON.stringify(v));
+ const pushHistory=()=>{history.push(clone(timeline)); if(history.length>60)history.shift(); future=[];};
+ const originalRender=window.renderTimeline;
+ const originalAdd=window.addMediaToTimeline;
+ const originalDrop=window.onClipDrop;
+ const originalClear=window.clearTimeline;
+ window.addMediaToTimeline=function(mid){pushHistory(); originalAdd(mid);};
+ window.clearTimeline=function(){if(timeline.length)pushHistory(); originalClear(); selectedClipId=null;};
+ function selectedIndex(){return timeline.findIndex(c=>c.id===selectedClipId)}
+ function syncButtons(){const i=selectedIndex(); document.getElementById('deleteBtn').disabled=i<0;document.getElementById('dupBtn').disabled=i<0;document.getElementById('splitBtn').disabled=i<0;document.getElementById('undoBtn').disabled=!history.length;document.getElementById('redoBtn').disabled=!future.length;}
+ window.renderTimeline=function(){originalRender(); const track=document.getElementById('track'); if(!timeline.length){syncButtons();return;}
+   // professional ruler + dynamic zoom sizing
+   const total=tlTotalDuration(), ruler=document.createElement('div');ruler.className='tl-ruler'; ruler.style.width=Math.max(track.scrollWidth,total*zoom)+'px';
+   for(let sec=0;sec<=Math.ceil(total);sec+=Math.max(1,Math.ceil(50/zoom))){const tick=document.createElement('div');tick.className='tl-tick';tick.style.left=(sec*zoom)+'px';tick.textContent=fmtTime(sec);ruler.appendChild(tick)}
+   track.parentElement.insertBefore(ruler,track);
+   track.style.minWidth=(total*zoom)+'px';
+   [...track.querySelectorAll('.tl-clip')].forEach((el,i)=>{const c=timeline[i], dur=Math.max(.2,c.trimOut-c.trimIn);el.style.width=Math.max(48,dur*zoom)+'px';if(c.id===selectedClipId)el.classList.add('selected');el.addEventListener('click',()=>{selectedClipId=c.id;syncButtons(); [...track.querySelectorAll('.tl-clip')].forEach(x=>x.classList.remove('selected'));el.classList.add('selected')});});
+   syncButtons();
+ };
+ function timelineElapsedAt(idx){let x=0;for(let i=0;i<idx;i++)x+=Math.max(.2,timeline[i].trimOut-timeline[i].trimIn);return x}
+ function seekAtEvent(e){const rect=document.getElementById('track').getBoundingClientRect();const x=e.clientX-rect.left+document.getElementById('tlScroll').scrollLeft;let sec=Math.max(0,x/zoom); // snap seek
+   sec=Math.round(sec/snapSeconds)*snapSeconds; sec=Math.min(sec,tlTotalDuration()); seekSequence(sec);}
+ document.getElementById('track').addEventListener('dblclick',seekAtEvent);
+ document.getElementById('tlZoom').addEventListener('input',e=>{zoom=+e.target.value;renderTimeline();});
+ document.getElementById('deleteBtn').onclick=()=>{const i=selectedIndex();if(i<0)return;pushHistory();timeline.splice(i,1);selectedClipId=timeline[Math.min(i,timeline.length-1)]?.id||null;renderTimeline();showToast('Clip deleted');};
+ document.getElementById('dupBtn').onclick=()=>{const i=selectedIndex();if(i<0)return;pushHistory();const c=clone(timeline[i]);c.id='t'+(uidCounter++);timeline.splice(i+1,0,c);selectedClipId=c.id;renderTimeline();showToast('Clip duplicated');};
+ document.getElementById('splitBtn').onclick=()=>{let i=selectedIndex();if(i<0)return;let global=seq.elapsed||0;let local=global-timelineElapsedAt(i);let c=timeline[i], dur=c.trimOut-c.trimIn;if(local<=.15||local>=dur-.15){showToast('Move playhead inside the selected clip to split');return;}pushHistory();let cut=c.trimIn+local;let right=clone(c);right.id='t'+(uidCounter++);right.trimIn=cut;c.trimOut=cut;timeline.splice(i+1,0,right);selectedClipId=right.id;renderTimeline();showToast('Clip split');};
+ document.getElementById('undoBtn').onclick=()=>{if(!history.length)return;future.push(clone(timeline));timeline=history.pop();selectedClipId=null;renderTimeline();};
+ document.getElementById('redoBtn').onclick=()=>{if(!future.length)return;history.push(clone(timeline));timeline=future.pop();selectedClipId=null;renderTimeline();};
+ // Override trim commit history and snapping
+ const oldStart=window.startTrim; window.startTrim=function(e,idx,side){pushHistory();selectedClipId=timeline[idx].id;oldStart(e,idx,side)};
+ const oldDrop=window.onClipDrop;window.onClipDrop=function(e,idx){if(dragClipIdx!==null&&dragClipIdx!==idx)pushHistory();oldDrop(e,idx)};
+ // keyboard shortcuts
+ document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;const i=selectedIndex();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();document.getElementById(e.shiftKey?'redoBtn':'undoBtn').click();return;}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();document.getElementById('deleteBtn').click();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();document.getElementById('dupBtn').click();}if(e.key.toLowerCase()==='s'&&i>=0){e.preventDefault();document.getElementById('splitBtn').click();}if(e.key==='ArrowLeft'){seekSequence(Math.max(0,(seq.elapsed||0)-1));}if(e.key==='ArrowRight'){seekSequence(Math.min(tlTotalDuration(),(seq.elapsed||0)+1));}});
+ // click empty timeline seeks
+ document.getElementById('track').addEventListener('click',e=>{if(e.target.id==='track')seekAtEvent(e)});
+ setTimeout(()=>renderTimeline(),0);
+})();
 </script>
 </body>
 </html>
