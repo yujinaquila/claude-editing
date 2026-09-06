@@ -22,14 +22,28 @@
   const app = () => document.getElementById('app');
   const login = () => document.getElementById('loginScreen');
 
-  function showApp(user) {
+  function userInfo(su) {
+    const meta = su?.user_metadata || {};
+    return {
+      name: meta.full_name || meta.name || su?.email || 'User',
+      email: su?.email || '',
+      picture: meta.avatar_url || meta.picture || null
+    };
+  }
+
+  async function showApp(su) {
+    const info = userInfo(su);
+    // Reuse the editor's existing login handoff so IndexedDB, avatar, user
+    // state and the rest of the editor initialize exactly like email login.
+    if (typeof window.completeLogin === 'function') {
+      try { await window.completeLogin(info.name, info.email, info.picture); }
+      catch (e) { console.warn('[ClipForge Auth] completeLogin failed', e); }
+    }
     const a = app(), l = login();
     if (a) a.classList.add('active');
     if (l) l.style.display = 'none';
-    window.__clipforgeUser = user || null;
-    window.dispatchEvent(new CustomEvent('clipforge:auth-ready', { detail: { user } }));
-    try { window.renderMediaList?.(); } catch {}
-    try { window.renderTimeline?.(); } catch {}
+    window.__clipforgeUser = su || null;
+    window.dispatchEvent(new CustomEvent('clipforge:auth-ready', { detail: { user: su } }));
   }
 
   function showLogin() {
@@ -46,6 +60,16 @@
         el.classList.add('hidden');
       }
     });
+    const toast = document.getElementById('toast');
+    if (toast && /session failed|sign-in succeeded|coba refresh/i.test(toast.textContent || '')) {
+      toast.style.display = 'none';
+    }
+  }
+
+  function cleanAuthParams() {
+    if (location.hash.includes('access_token') || location.search.includes('code=') || location.search.includes('error=')) {
+      history.replaceState(null, '', location.origin + location.pathname);
+    }
   }
 
   async function recoverSession() {
@@ -54,8 +78,9 @@
       try {
         const { data, error } = await client.auth.getSession();
         if (!error && data?.session?.user) {
-          showApp(data.session.user);
+          await showApp(data.session.user);
           clearAuthError();
+          cleanAuthParams();
           return data.session;
         }
       } catch (e) {
@@ -63,13 +88,12 @@
       }
       await new Promise(r => setTimeout(r, 350));
     }
-    // getUser forces a server-side check if the local session is available but
-    // getSession was racing the OAuth callback.
     try {
       const { data, error } = await client.auth.getUser();
       if (!error && data?.user) {
-        showApp(data.user);
+        await showApp(data.user);
         clearAuthError();
+        cleanAuthParams();
         return { user: data.user };
       }
     } catch (e) {
@@ -101,8 +125,6 @@
     const button = buttons.find(el => /google/i.test((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')));
     if (!button || button.dataset.clipforgeAuthRepair) return;
     button.dataset.clipforgeAuthRepair = '1';
-    // Use a capture listener so the old inline OAuth handler cannot start a
-    // second redirect with the stale callback/session logic.
     document.addEventListener('click', e => {
       if (e.target === button || button.contains(e.target)) googleSignIn(e);
     }, true);
@@ -112,6 +134,7 @@
     if (session?.user) {
       showApp(session.user);
       clearAuthError();
+      cleanAuthParams();
     } else if (event === 'SIGNED_OUT') {
       showLogin();
     }
