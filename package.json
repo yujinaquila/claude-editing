@@ -2,8 +2,15 @@
   "name": "clipforge-ai",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "AI-assisted, prompt-driven marketing video editor (static site, Supabase Auth for Google login)",
   "scripts": {
-    "dev": "npx serve . -l 3000"
+    "dev": "node server.js",
+    "build": "echo 'Build complete'",
+    "start": "node server.js",
+    "lint": "node --check server.js api/ai.js api/transcribe.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
   }
 }
