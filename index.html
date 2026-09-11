@@ -34,7 +34,7 @@
 <meta property="og:description" content="AI-assisted, prompt-driven marketing video editor with transcription and smart editing.">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
   :root{
     --bg:#0e0e11;
@@ -2715,7 +2715,7 @@ function updateSubtitleOverlay(timelineClip, tInSourceClip){
 
   // If Subtitle Studio module is loaded, let it render rich styled overlays
   if(window.__subtitleStudio && typeof window.__subtitleStudio.renderOverlay === 'function'){
-    window.__subtitleStudio.renderOverlay(overlay, words, tInSourceClip);
+    window.__subtitleStudio.renderOverlay(overlay, words, tInSourceClip, timelineClip);
     return;
   }
 
@@ -3757,5 +3757,6 @@ renderTimeline();
 </div>
 
   <script type="module" src="/src/phase4-smart-ai.js"></script>
+  <script type="module" src="/src/phase5-subtitle-studio.js"></script>
 </body>
 </html>
