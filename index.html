@@ -292,7 +292,12 @@
   .tl-transition-badge.flash{border-color:#ffd166;background:rgba(255,209,102,.18);color:#ffd166;}
   .tl-transition-badge.film{border-color:#ff9f1c;background:rgba(255,159,28,.18);color:#ff9f1c;}
   .tl-transition-badge.blur{border-color:#06d6a0;background:rgba(6,214,160,.18);color:#06d6a0;}
-  .tl-transition-badge.fade{border-color:#38bdf8;background:rgba(56,189,248,.18);color:#38bdf8;}
+  .tl-transition-badge.zoom{border-color:#38bdf8;background:rgba(56,189,248,.18);color:#38bdf8;}
+  .tl-transition-badge.glitch{border-color:#ec4899;background:rgba(236,72,153,.18);color:#ec4899;}
+  .tl-transition-badge.wipe{border-color:#a855f7;background:rgba(168,85,247,.18);color:#a855f7;}
+  .tl-transition-badge.leak{border-color:#fbbf24;background:rgba(251,191,36,.18);color:#fbbf24;}
+  .tl-transition-badge.spin{border-color:#10b981;background:rgba(16,185,129,.18);color:#10b981;}
+  .tl-transition-badge.fade{border-color:#818cf8;background:rgba(129,140,248,.18);color:#818cf8;}
   .tl-transition-badge.dip{border-color:#c084fc;background:rgba(192,132,252,.18);color:#c084fc;}
   .tl-transition-badge.cut{border-color:var(--border);background:transparent;color:var(--muted);}
 
@@ -334,6 +339,41 @@
     0%{opacity:1;filter:blur(0px);}
     40%{opacity:1;filter:blur(2px);}
     100%{opacity:0;filter:blur(0px);}
+  }
+  .transition-overlay.tr-zoom-active{animation:liveZoomAnim .44s cubic-bezier(.1,.9,.2,1) forwards;}
+  @keyframes liveZoomAnim{
+    0%{background:radial-gradient(circle,rgba(255,255,255,.7) 0%,rgba(124,92,255,.25) 55%,transparent 100%);transform:scale(0.8);opacity:1;}
+    50%{transform:scale(1.18);opacity:0.9;}
+    100%{transform:scale(1.45);opacity:0;}
+  }
+  .transition-overlay.tr-glitch-active{
+    animation:liveGlitchAnim .38s steps(2) forwards;
+    background:linear-gradient(90deg,rgba(0,255,255,.35) 0%,transparent 30%,rgba(255,0,128,.35) 70%,transparent 100%);
+  }
+  @keyframes liveGlitchAnim{
+    0%{opacity:1;transform:translate(4px,-2px);}
+    25%{opacity:1;transform:translate(-5px,3px);}
+    50%{opacity:0.9;transform:translate(3px,-1px);}
+    75%{opacity:0.7;transform:translate(-2px,2px);}
+    100%{opacity:0;transform:translate(0,0);}
+  }
+  .transition-overlay.tr-wipe-active{animation:liveWipeAnim .45s cubic-bezier(.25,1,.5,1) forwards;}
+  @keyframes liveWipeAnim{
+    0%{background:linear-gradient(90deg,transparent 0%,#7c5cff 48%,#ffffff 50%,transparent 54%);transform:translateX(-100%);opacity:1;}
+    60%{opacity:1;}
+    100%{transform:translateX(100%);opacity:0;}
+  }
+  .transition-overlay.tr-leak-active{animation:liveLeakAnim .48s ease-out forwards;}
+  @keyframes liveLeakAnim{
+    0%{background:radial-gradient(ellipse at 80% 20%,rgba(255,180,50,.9) 0%,rgba(255,80,40,.6) 45%,transparent 80%);opacity:1;}
+    50%{background:radial-gradient(ellipse at 50% 50%,rgba(255,220,100,.95) 0%,rgba(255,120,40,.7) 50%,transparent 85%);opacity:1;}
+    100%{opacity:0;}
+  }
+  .transition-overlay.tr-spin-active{animation:liveSpinAnim .42s cubic-bezier(.1,.85,.25,1) forwards;}
+  @keyframes liveSpinAnim{
+    0%{background:rgba(124,92,255,.4);transform:rotate(-8deg) scale(1.1);opacity:1;}
+    50%{transform:rotate(4deg) scale(1.05);opacity:0.8;}
+    100%{transform:rotate(0deg) scale(1);opacity:0;}
   }
   .transition-overlay.tr-dip-active{animation:liveDipAnim .45s ease-in-out forwards;}
   @keyframes liveDipAnim{
@@ -468,11 +508,12 @@
     </div>
   </div>
 
-  <!-- LEFT: media + AI -->
+  <!-- LEFT: media + AI + Subtitles -->
   <div id="left">
     <div class="tabs">
       <div class="tab active" data-tab="media" onclick="switchTab('media')" data-i18n="tabMedia">Media</div>
       <div class="tab" data-tab="ai" onclick="switchTab('ai')" data-i18n="tabAI">AI Edit</div>
+      <div class="tab" data-tab="subtitles" onclick="switchTab('subtitles')">💬 Subtitles</div>
     </div>
 
     <div class="tab-body" id="tabMediaBody">
@@ -481,6 +522,12 @@
       </button>
       <input type="file" id="fileInput" accept="video/*" multiple class="hidden">
       <div id="mediaList"></div>
+    </div>
+
+    <div class="tab-body hidden" id="tabSubtitlesBody">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        Word-level karaoke styling, animations, keyword triggers, and live video synchronization:
+      </div>
     </div>
 
     <div class="tab-body hidden" id="tabAIBody">
@@ -492,6 +539,8 @@
         <div class="ai-style-pills">
           <button type="button" class="ai-style-pill active" data-style="viral" onclick="selectAutoEditStyle('viral', this)">🔥 Viral Reel</button>
           <button type="button" class="ai-style-pill" data-style="hook" onclick="selectAutoEditStyle('hook', this)">⚡ 3s Hook</button>
+          <button type="button" class="ai-style-pill" data-style="yt_long" onclick="selectAutoEditStyle('yt_long', this)">📺 YouTube Vlog</button>
+          <button type="button" class="ai-style-pill" data-style="explainer" onclick="selectAutoEditStyle('explainer', this)">💡 Explainer</button>
           <button type="button" class="ai-style-pill" data-style="cinematic" onclick="selectAutoEditStyle('cinematic', this)">🎬 Cinematic</button>
           <button type="button" class="ai-style-pill" data-style="beat" onclick="selectAutoEditStyle('beat', this)">✂ Fast Cuts</button>
         </div>
@@ -502,9 +551,14 @@
               <option value="flash">⚡ Flash Strobe</option>
               <option value="film">🎞️ Film Strip Roll</option>
               <option value="blur">🌀 Motion Blur</option>
-              <option value="mix" selected>🔀 Smart Mix</option>
+              <option value="zoom">🔍 Kinetic Zoom</option>
+              <option value="glitch">📺 Cyber Glitch</option>
+              <option value="wipe">🏎️ Speed Wipe</option>
+              <option value="leak">☀️ Light Leak</option>
+              <option value="spin">🔄 Whip Spin</option>
               <option value="fade">✨ Crossfade</option>
               <option value="dip">⬛ Dip to Black</option>
+              <option value="mix" selected>🔀 Smart Dynamic Mix</option>
               <option value="cut">✂ Clean Cuts</option>
             </select>
           </div>
@@ -514,20 +568,32 @@
               <option value="0" selected>⚡ Auto (Best moments)</option>
               <option value="15">⏱ 15s (Shorts/TikTok)</option>
               <option value="30">⏱ 30s (Reels)</option>
-              <option value="60">⏱ 60s (Longer)</option>
+              <option value="60">⏱ 60s (Standard Short)</option>
+              <option value="120">⏱ 2 min (YouTube Teaser)</option>
+              <option value="180">⏱ 3 min (YouTube Standard)</option>
+              <option value="300">⏱ 5 min (YouTube In-Depth)</option>
+              <option value="600">⏱ 10 min (YouTube Full)</option>
+              <option value="-1">♾️ Full Length (All Clips)</option>
             </select>
           </div>
         </div>
         <select class="tpl" id="tplSelect" onchange="applyTemplate()">
           <option value="" data-i18n="tplCustom">Custom prompt instructions…</option>
-          <option value="hook" data-i18n="tplHook">TikTok hook — punchy 3s intro</option>
-          <option value="reel" data-i18n="tplReel">Instagram Reel — fast cuts on the beat</option>
-          <option value="highlights" data-i18n="tplHighlights">Highlight reel from best moments</option>
-          <option value="captions" data-i18n="tplCaptions">Bold caption style suggestions</option>
-          <option value="silence" data-i18n="tplSilence">Tighten pacing — remove dead air</option>
+          <option value="custom_template">✏️ Custom: Guided Edit Formula Template</option>
+          <option value="yt_vlog">📺 YouTube: Engaging Vlog &amp; Storytelling</option>
+          <option value="yt_explainer">💡 YouTube: Tutorial &amp; Step-by-Step Explainer</option>
+          <option value="yt_review">📦 YouTube: Tech &amp; Product Review</option>
+          <option value="yt_podcast">🎙️ YouTube: Podcast &amp; Talk Show Highlights</option>
+          <option value="yt_gaming">🎮 YouTube: Gaming &amp; Action Montage</option>
+          <option value="tiktok_hook">⚡ TikTok / Shorts: 3-Second Retention Hook</option>
+          <option value="reel_beat">🔥 Instagram Reel: Fast Cuts on the Beat</option>
+          <option value="ecommerce_ad">🛍️ E-Commerce: High-Converting Video Ad</option>
+          <option value="cinematic">🎬 Cinematic: B-Roll Masterpiece</option>
+          <option value="silence">✂ Smart Jump Cuts: Tighten Pacing &amp; Remove Dead Air</option>
+          <option value="captions">💬 Subtitle Kinetic: Spoken-Cadence Narrative</option>
         </select>
         <textarea class="prompt" id="promptInput" data-i18n-ph="promptPh"
-          placeholder="Describe your desired edit, e.g. 'Make a 15s viral TikTok hook with energetic flash cuts and fast pacing'"></textarea>
+          placeholder="Describe your desired edit, e.g. 'Make a 3-minute engaging YouTube vlog with smooth motion blur transitions and B-roll cutaways'"></textarea>
         <button class="ai-run-big" id="promptRunBtn" onclick="runPromptEdit()">
           <span>⚡</span> <span data-i18n="generateBtn">Auto-Edit with AI</span>
         </button>
@@ -564,6 +630,7 @@
     <div id="previewWrap">
       <div id="previewContainer" class="preview-box aspect-9-16">
         <video id="previewVideo" controls playsinline></video>
+        <canvas id="freezeCanvas" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:45;"></canvas>
         <div id="transitionOverlay" class="transition-overlay"></div>
         <div id="subtitleOverlay" class="subtitle-overlay hidden"></div>
         <div id="emptyPreview">
@@ -617,11 +684,16 @@
           <button class="btn-ghost" id="globalTransitionBtn" onclick="toggleGlobalTransitionMenu(event)" title="Apply transition to all cuts">
             <span id="gtIcon">⚡</span> <span id="gtLabel">Transitions</span> ▾
           </button>
-          <div id="globalTransitionMenu" class="tl-popover hidden" style="top:30px;right:0;width:190px">
+          <div id="globalTransitionMenu" class="tl-popover hidden" style="top:30px;right:0;width:200px">
             <div class="tl-popover-title">Transitions (All Cuts)</div>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('flash')"><span>⚡</span> Flash Strobe</button>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('film')"><span>🎞️</span> Film Strip Roll</button>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('blur')"><span>🌀</span> Motion Blur</button>
+            <button type="button" class="tl-popover-item" onclick="setAllTransitions('zoom')"><span>🔍</span> Kinetic Zoom</button>
+            <button type="button" class="tl-popover-item" onclick="setAllTransitions('glitch')"><span>📺</span> Cyber Glitch</button>
+            <button type="button" class="tl-popover-item" onclick="setAllTransitions('wipe')"><span>🏎️</span> Speed Wipe</button>
+            <button type="button" class="tl-popover-item" onclick="setAllTransitions('leak')"><span>☀️</span> Light Leak</button>
+            <button type="button" class="tl-popover-item" onclick="setAllTransitions('spin')"><span>🔄</span> Whip Spin</button>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('fade')"><span>✨</span> Crossfade</button>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('dip')"><span>⬛</span> Dip to Black</button>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('mix')"><span>🔀</span> Smart Dynamic Mix</button>
@@ -1084,6 +1156,13 @@ function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
   document.getElementById('tabMediaBody').classList.toggle('hidden', tab!=='media');
   document.getElementById('tabAIBody').classList.toggle('hidden', tab!=='ai');
+  const subBody = document.getElementById('tabSubtitlesBody');
+  if(subBody){
+    subBody.classList.toggle('hidden', tab!=='subtitles');
+    if(tab==='subtitles' && window.__subtitleStudio){
+      window.__subtitleStudio.openPanel();
+    }
+  }
 }
 
 /* ===================== import & media bin ===================== */
@@ -1221,7 +1300,10 @@ function syncTimelineButtons(){
 
 /* ===================== transition effects ===================== */
 function getTransitionIcon(type){
-  const map = { flash:'⚡', film:'🎞️', blur:'🌀', fade:'✨', dip:'⬛', cut:'✂' };
+  const map = {
+    flash:'⚡', film:'🎞️', blur:'🌀', zoom:'🔍', glitch:'📺',
+    wipe:'🏎️', leak:'☀️', spin:'🔄', fade:'✨', dip:'⬛', cut:'✂', mix:'🔀'
+  };
   return map[type] || '✂';
 }
 
@@ -1230,14 +1312,20 @@ function getTransitionLabel(type){
     flash: 'Flash Strobe',
     film: 'Film Strip Roll',
     blur: 'Motion Blur',
+    zoom: 'Kinetic Zoom',
+    glitch: 'Cyber Glitch',
+    wipe: 'Speed Wipe',
+    leak: 'Light Leak',
+    spin: 'Whip Spin',
     fade: 'Crossfade',
     dip: 'Dip to Black',
-    cut: 'Straight Cut'
+    cut: 'Straight Cut',
+    mix: 'Smart Dynamic Mix'
   };
   return map[type] || 'Cut';
 }
 
-function triggerLiveTransition(type, dur = 420){
+function triggerLiveTransition(type, dur = 440){
   const overlay = document.getElementById('transitionOverlay');
   const vid = document.getElementById('previewVideo');
   if(!type || type === 'cut') return;
@@ -1249,13 +1337,19 @@ function triggerLiveTransition(type, dur = 420){
     else if(type === 'film') overlay.classList.add('tr-film-active');
     else if(type === 'dip') overlay.classList.add('tr-dip-active');
     else if(type === 'fade') overlay.classList.add('tr-fade-active');
+    else if(type === 'zoom') overlay.classList.add('tr-zoom-active');
+    else if(type === 'glitch') overlay.classList.add('tr-glitch-active');
+    else if(type === 'wipe') overlay.classList.add('tr-wipe-active');
+    else if(type === 'leak') overlay.classList.add('tr-leak-active');
+    else if(type === 'spin') overlay.classList.add('tr-spin-active');
+    else if(type === 'blur') overlay.classList.add('tr-blur-active');
 
     setTimeout(()=>{
       if(overlay) overlay.className = 'transition-overlay';
     }, dur);
   }
 
-  if(type === 'blur' && vid){
+  if((type === 'blur' || type === 'zoom' || type === 'spin') && vid){
     vid.classList.remove('tr-blur-active');
     void vid.offsetWidth;
     vid.classList.add('tr-blur-active');
@@ -1277,7 +1371,7 @@ function setAllTransitions(type){
     return;
   }
   pushTimelineHistory();
-  const mixPool = ['flash', 'film', 'blur', 'fade'];
+  const mixPool = ['flash', 'film', 'blur', 'zoom', 'glitch', 'wipe', 'leak', 'fade'];
   for(let i=1; i<timeline.length; i++){
     if(type === 'mix'){
       timeline[i].transition = mixPool[(i - 1) % mixPool.length];
@@ -1850,10 +1944,35 @@ function loadSeqClip(idx, autoplay, seekWithin){
   document.getElementById('emptyPreview').style.display = 'none';
   previewVideoEl.style.display = 'block';
   const startAt = c.trimIn + (seekWithin||0);
+
+  // Eliminate blank gap by holding the previous frame on freezeCanvas
+  const freezeCanvas = document.getElementById('freezeCanvas');
+  if(freezeCanvas && previewVideoEl.videoWidth > 0 && idx > 0 && !seekWithin){
+    try{
+      freezeCanvas.width = previewVideoEl.videoWidth;
+      freezeCanvas.height = previewVideoEl.videoHeight;
+      const fctx = freezeCanvas.getContext('2d');
+      fctx.drawImage(previewVideoEl, 0, 0);
+      freezeCanvas.style.display = 'block';
+    }catch(_){}
+  }
+
+  const hideFreeze = ()=>{
+    if(freezeCanvas) freezeCanvas.style.display = 'none';
+  };
+
   const onReady = ()=>{
     previewVideoEl.currentTime = startAt;
     previewVideoEl.removeEventListener('loadedmetadata', onReady);
-    if(autoplay) previewVideoEl.play().catch(()=>{});
+    if(autoplay){
+      previewVideoEl.play().then(()=>{
+        setTimeout(hideFreeze, 45);
+      }).catch(()=>{
+        hideFreeze();
+      });
+    } else {
+      setTimeout(hideFreeze, 80);
+    }
   };
 
   // Trigger live transition on cut switch
@@ -1898,6 +2017,16 @@ previewVideoEl.addEventListener('timeupdate', ()=>{
     if(previewVideoEl.currentTime >= c.trimOut - 0.05){
       seq.outgoingTransitionFired = false;
       if(seq.index < timeline.length-1){
+        // Freeze frame snapshot before cut
+        const freezeCanvas = document.getElementById('freezeCanvas');
+        if(freezeCanvas && previewVideoEl.videoWidth > 0){
+          try{
+            freezeCanvas.width = previewVideoEl.videoWidth;
+            freezeCanvas.height = previewVideoEl.videoHeight;
+            freezeCanvas.getContext('2d').drawImage(previewVideoEl, 0, 0);
+            freezeCanvas.style.display = 'block';
+          }catch(_){}
+        }
         loadSeqClip(seq.index+1, seq.playing);
       } else {
         seq.playing = false;
@@ -1947,52 +2076,120 @@ function selectAutoEditStyle(style, btnEl){
   document.querySelectorAll('.ai-style-pills .ai-style-pill').forEach(b=>b.classList.remove('active'));
   if(btnEl) btnEl.classList.add('active');
   const promptInput = document.getElementById('promptInput');
-  const tplSelect = document.getElementById('tplSelect');
   const trSelect = document.getElementById('autoEditTransitionSelect');
+  const durSelect = document.getElementById('autoEditTargetDuration');
   
   if(style === 'viral'){
     promptInput.value = currentLang==='id'
       ? "Buat edit viral bertempo cepat untuk TikTok/Reels dengan hook pembuka kuat, potongan dinamis, dan transisi flash."
       : "Make a high-energy viral edit for TikTok/Reels with a punchy hook, dynamic cuts, and energetic flash transitions.";
     if(trSelect) trSelect.value = 'flash';
+    if(durSelect) durSelect.value = '30';
   } else if(style === 'hook'){
     promptInput.value = currentLang==='id'
       ? "Pilih momen 3 detik paling memikat untuk hook pembuka, disambung potongan klip terbaik."
       : "Find the strongest 3s opener hook moment, followed by fast-paced highlight cuts.";
     if(trSelect) trSelect.value = 'mix';
+    if(durSelect) durSelect.value = '15';
+  } else if(style === 'yt_long'){
+    promptInput.value = currentLang==='id'
+      ? "Susun video YouTube bergaya vlog yang imersif: intro hook menarik, potongan naratif berbobot, pacing seimbang, dan transisi halus."
+      : "Create an engaging YouTube long-form vlog: compelling intro teaser, narrative story flow, balanced pacing, and smooth transitions.";
+    if(trSelect) trSelect.value = 'wipe';
+    if(durSelect) durSelect.value = '180';
+    setPreviewAspect('16:9');
+  } else if(style === 'explainer'){
+    promptInput.value = currentLang==='id'
+      ? "Edit tutorial / explainer YouTube yang jelas, potong jeda membosankan, gunakan transisi kinetic zoom pada poin penting."
+      : "Edit a clear YouTube tutorial / explainer video: trim pauses, emphasize key steps, and use kinetic zoom transitions on important points.";
+    if(trSelect) trSelect.value = 'zoom';
+    if(durSelect) durSelect.value = '300';
+    setPreviewAspect('16:9');
   } else if(style === 'cinematic'){
     promptInput.value = currentLang==='id'
       ? "Susun cerita visual sinematik yang mengalir dengan potongan halus dan transisi roll film strip."
       : "Assemble a cinematic storytelling sequence with film strip transitions and smooth pacing.";
     if(trSelect) trSelect.value = 'film';
+    if(durSelect) durSelect.value = '60';
   } else if(style === 'beat'){
     promptInput.value = currentLang==='id'
       ? "Potong klip mengikuti beat cepat dengan motion blur, hilangkan jeda sunyi."
       : "Cut fast rhythmic segments with motion blur transitions, zero silent gaps.";
     if(trSelect) trSelect.value = 'blur';
+    if(durSelect) durSelect.value = '30';
   }
 }
 
 function applyTemplate(){
   const v = document.getElementById('tplSelect').value;
+  const durSelect = document.getElementById('autoEditTargetDuration');
+  const trSelect = document.getElementById('autoEditTransitionSelect');
   const map = {
-    hook: currentLang==='id'
-      ? "Buat hook 3 detik pertama yang sangat kuat dari klip-klip ini untuk video TikTok. Sarankan kalimat pembuka, momen visual mana yang dipakai, dan gaya caption."
-      : "Create a very strong first-3-seconds hook from these clips for a TikTok video. Suggest the opening line, which visual moment to use, and a caption style.",
-    reel: currentLang==='id'
-      ? "Sarankan urutan potongan cepat yang mengikuti beat musik untuk Instagram Reel berdurasi 15-30 detik dari klip-klip ini."
-      : "Suggest a fast-cut sequence that follows a music beat for a 15-30s Instagram Reel using these clips.",
-    highlights: currentLang==='id'
-      ? "Pilih momen-momen terbaik dari semua klip yang diimpor dan susun jadi highlight reel yang menarik untuk marketing."
-      : "Pick the best moments across all imported clips and assemble them into an engaging marketing highlight reel.",
-    captions: currentLang==='id'
-      ? "Berikan 5 ide caption bold/tegas yang cocok untuk video marketing pendek ini, lengkap dengan nada suara mereknya."
-      : "Give me 5 bold caption ideas suited to this short marketing video, including tone of voice.",
+    custom_template: currentLang==='id'
+      ? `[FORMAT]: YouTube Video / TikTok Reel\n[TOPIK]: Jelaskan topik video Anda di sini\n[HOOK]: Hook pembuka 3 detik pertama yang memicu rasa penasaran\n[PACING]: Cepat / Menengah / Santai (Target durasi: ~3 menit)\n[TRANSISI]: Motion blur dan kinetic zoom pada poin kunci\n[CALL TO ACTION]: Ajak penonton like, subscribe, atau beri komentar`
+      : `[FORMAT]: YouTube Video / TikTok Reel\n[TOPIC]: Your video topic or subject here\n[HOOK]: High-retention opening teaser in the first 3 seconds\n[PACING]: Fast / Moderate / Narrative (Target duration: ~3 minutes)\n[TRANSITIONS]: Motion blur and kinetic zoom on key highlight moments\n[CALL TO ACTION]: Clear subscribe / engagement outro prompt`,
+
+    yt_vlog: currentLang==='id'
+      ? "Buat video YouTube Vlog berdurasi 3-5 menit: mulai dengan cold open preview 5 detik, transisi speed wipe ke intro, lalu susun alur cerita dinamis dengan B-roll cutaway."
+      : "Create a 3-5 minute YouTube Vlog: start with a 5-second cold open teaser, transition into main narrative with speed wipes, and maintain engaging pacing with B-roll cutaways.",
+
+    yt_explainer: currentLang==='id'
+      ? "Edit video tutorial / explainer YouTube: tata per bab / langkah, hapus jeda kata 'um/ah', beri penekanan dengan transisi zoom pada setiap langkah baru."
+      : "Edit a YouTube tutorial / explainer video: organize by structured steps, eliminate dead air and pauses, and emphasize each new step with kinetic zoom transitions.",
+
+    yt_review: currentLang==='id'
+      ? "Buat video ulasan produk YouTube: pembukaan first impressions dramatis, B-roll close-up produk dengan transisi light leak, lalu rangkuman kelebihan & kekurangan."
+      : "Create a YouTube product / tech review: dramatic first-impression hook, close-up product B-roll with light leak transitions, followed by clear pros & cons breakdown.",
+
+    yt_podcast: currentLang==='id'
+      ? "Pilih momen paling seru dan kontroversial dari rekaman podcast ini, potong jadi sorotan utama YouTube dengan transisi rapi."
+      : "Extract the most compelling and punchy discussion moments from this podcast, assembling an engaging YouTube highlight edit with clean transitions.",
+
+    yt_gaming: currentLang==='id'
+      ? "Susun montase aksi gaming YouTube: potong langsung ke momen kill/aksi seru, sinkronkan dengan transisi cyber glitch dan flash strobe."
+      : "Assemble an adrenaline-packed YouTube gaming montage: cut straight to peak action/win moments, synchronized with cyber glitch and flash strobe transitions.",
+
+    tiktok_hook: currentLang==='id'
+      ? "Buat hook 3 detik pertama yang sangat kuat dari klip-klip ini untuk video TikTok / Shorts. Mulai dari momen aksi paling intens."
+      : "Create an irresistible first 3-seconds hook from these clips for TikTok / Shorts. Start right at the peak action moment to prevent swipe-aways.",
+
+    reel_beat: currentLang==='id'
+      ? "Sarankan urutan potongan cepat yang mengikuti beat musik untuk Instagram Reel berdurasi 15-30 detik dengan transisi motion blur."
+      : "Suggest a fast-cut sequence that follows a music beat for a 15-30s Instagram Reel using motion blur transitions and zero lag.",
+
+    ecommerce_ad: currentLang==='id'
+      ? "Susun iklan produk berkonversi tinggi: Problem Hook (3s) -> Solusi & Demo Fitur (10s) -> Social Proof (5s) -> CTA Diskon Terbatas."
+      : "Assemble a high-converting e-commerce video ad: Problem Hook (3s) -> Solution & Feature Demo (10s) -> Social Proof (5s) -> Limited Time CTA.",
+
+    cinematic: currentLang==='id'
+      ? "Susun mahakarya sinematik: perpanjang durasi klip visual estetis, gunakan transisi film strip roll dan crossfade yang anggun."
+      : "Assemble a cinematic B-roll masterpiece: give breathing room to aesthetic shots, paired with film strip roll and elegant crossfade transitions.",
+
     silence: currentLang==='id'
-      ? "Sarankan cara merapikan tempo video ini dengan menghapus jeda sunyi dan mempercepat transisi antar klip."
-      : "Suggest how to tighten this video's pacing by removing silent gaps and speeding up transitions between clips.",
+      ? "Merapikan tempo video: potong semua jeda sunyi, nafas panjang, dan momen hening. Jadikan dialog rapat dan dinamis."
+      : "Tighten video pacing: detect and eliminate silent gaps, hesitations, and idle pauses. Keep dialogue snappy with clean jump cuts.",
+
+    captions: currentLang==='id'
+      ? "Rancang narasi caption dinamis dengan Subtitle Studio: beri highlight warna kuning pada kata kunci penarik perhatian."
+      : "Design kinetic subtitle typography: synchronize bold word-by-word captions with yellow highlight triggers on high-impact keywords."
   };
-  if(map[v]) document.getElementById('promptInput').value = map[v];
+
+  if(map[v]){
+    document.getElementById('promptInput').value = map[v];
+  }
+
+  // Adjust duration & aspect ratio according to preset
+  if(v.startsWith('yt_')){
+    if(durSelect && (!durSelect.value || Number(durSelect.value) < 120)) durSelect.value = '180';
+    setPreviewAspect('16:9');
+    if(v === 'yt_gaming' && trSelect) trSelect.value = 'glitch';
+    else if(v === 'yt_review' && trSelect) trSelect.value = 'leak';
+    else if(v === 'yt_explainer' && trSelect) trSelect.value = 'zoom';
+    else if(trSelect) trSelect.value = 'wipe';
+  } else if(v === 'tiktok_hook' || v === 'reel_beat'){
+    if(durSelect) durSelect.value = '30';
+    setPreviewAspect('9:16');
+  }
 }
 
 /* ===================== Secure AI API helper ===================== */
@@ -2064,12 +2261,13 @@ async function runPromptEdit(){
       highlights: (m.highlights||[]).slice(0,4).map(h=>({start:+h.start.toFixed(1), end:+h.end.toFixed(1), score:+h.score.toFixed(2)}))
     }));
 
-    const sys = `You are ClipForge AI, a top-tier viral video editor specialized in TikTok, Instagram Reels, and YouTube Shorts.
+    const targetDurStr = targetDur === -1 ? 'Full duration (all clips in full)' : (targetDur ? targetDur + 's' : 'auto (best moments)');
+    const sys = `You are ClipForge AI, an expert video editor specialized in YouTube videos (vlogs, explainers, reviews), high-retention TikToks, and Instagram Reels.
 You need to construct an automated edit from available video clips.
-Style: ${currentStyle} (viral / hook / cinematic / beat)
-Transition Preference: ${transPref} (flash, film, blur, mix, fade, dip, cut)
-Target Duration: ${targetDur ? targetDur + 's' : 'auto'}
-User custom prompt / note: "${prompt || 'Auto edit my clips for highest retention'}"
+Style: ${currentStyle} (viral / hook / yt_long / explainer / cinematic / beat)
+Transition Preference: ${transPref} (flash, film, blur, zoom, glitch, wipe, leak, spin, fade, dip, cut, mix)
+Target Duration: ${targetDurStr}
+User custom prompt / note: "${prompt || 'Auto edit my clips with optimal pacing and transitions'}"
 
 Available Clips with real detected energy moments:
 ${JSON.stringify(clipSummaryData)}
@@ -2077,7 +2275,7 @@ ${JSON.stringify(clipSummaryData)}
 Respond ONLY with valid JSON (no markdown, no backticks, no commentary), structured exactly like this:
 {
   "summary": "Brief summary of the edit in ${currentLang==='id'?'Indonesian':'English'}",
-  "hookLine": "Catchy first 3 seconds opener caption",
+  "hookLine": "Catchy first 3 seconds opener caption or YouTube teaser",
   "captionIdeas": ["caption 1", "caption 2", "caption 3"],
   "cuts": [
     {
@@ -2134,39 +2332,77 @@ Respond ONLY with valid JSON (no markdown, no backticks, no commentary), structu
 /* Deterministic smart auto-edit algorithm if AI API is unreachable */
 function runSmartAutoEditEngine(clips, opts){
   const cuts = [];
-  const mixTransitions = ['flash', 'film', 'blur', 'fade'];
+  const mixTransitions = ['flash', 'film', 'blur', 'zoom', 'glitch', 'wipe', 'leak', 'fade'];
   const baseTrans = opts.transitionPref === 'mix' ? 'flash' : (opts.transitionPref || 'flash');
   let cutIdx = 0;
+  const target = Number(opts.targetDur) || 0;
 
-  // Pick clips and high-energy windows
-  clips.forEach((c, idx)=>{
-    const dur = c.duration || 5;
-    const trans = idx === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[(idx - 1) % mixTransitions.length] : baseTrans);
-
-    if(c.highlights && c.highlights.length){
-      const best = c.highlights.slice(0, 2);
-      best.forEach(h=>{
-        const sliceIn = Math.max(0, h.start - 0.2);
-        const sliceOut = Math.min(dur, Math.max(sliceIn + 1.8, h.end + 0.3));
-        cuts.push({
-          clipName: c.name,
-          trimIn: +sliceIn.toFixed(1),
-          trimOut: +sliceOut.toFixed(1),
-          transition: cuts.length === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[cutIdx % mixTransitions.length] : baseTrans)
-        });
-        cutIdx++;
-      });
-    } else {
-      const sliceDur = opts.style === 'beat' ? 2.2 : (opts.style === 'hook' ? 3.2 : 4.0);
+  if(target === -1){
+    // Full Length: keep entire clips
+    clips.forEach((c, idx)=>{
+      const dur = c.duration || 5;
       cuts.push({
         clipName: c.name,
         trimIn: 0,
-        trimOut: Math.min(dur, sliceDur),
-        transition: cuts.length === 0 ? 'cut' : trans
+        trimOut: +dur.toFixed(1),
+        transition: idx === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[(idx - 1) % mixTransitions.length] : baseTrans)
       });
-      cutIdx++;
-    }
-  });
+    });
+  } else if(target > 0){
+    // Target duration budget distributed across clips
+    const numClips = clips.length || 1;
+    const durPerClip = Math.max(1.8, target / numClips);
+    clips.forEach((c, idx)=>{
+      const dur = c.duration || 5;
+      let sliceIn = 0;
+      let sliceOut = Math.min(dur, durPerClip);
+      if(c.highlights && c.highlights.length){
+        const h = c.highlights[0];
+        sliceIn = Math.max(0, h.start - 0.4);
+        sliceOut = Math.min(dur, sliceIn + durPerClip);
+      }
+      cuts.push({
+        clipName: c.name,
+        trimIn: +sliceIn.toFixed(1),
+        trimOut: +sliceOut.toFixed(1),
+        transition: idx === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[(idx - 1) % mixTransitions.length] : baseTrans)
+      });
+    });
+  } else {
+    // Auto mode according to style
+    clips.forEach((c, idx)=>{
+      const dur = c.duration || 5;
+      const trans = idx === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[(idx - 1) % mixTransitions.length] : baseTrans);
+
+      if(c.highlights && c.highlights.length){
+        const best = c.highlights.slice(0, 2);
+        best.forEach(h=>{
+          const sliceIn = Math.max(0, h.start - 0.2);
+          const minLen = opts.style === 'yt_long' ? 6.0 : (opts.style === 'explainer' ? 8.0 : 2.5);
+          const sliceOut = Math.min(dur, Math.max(sliceIn + minLen, h.end + 0.3));
+          cuts.push({
+            clipName: c.name,
+            trimIn: +sliceIn.toFixed(1),
+            trimOut: +sliceOut.toFixed(1),
+            transition: cuts.length === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[cutIdx % mixTransitions.length] : baseTrans)
+          });
+          cutIdx++;
+        });
+      } else {
+        const sliceDur = opts.style === 'beat' ? 2.2 
+          : (opts.style === 'hook' ? 3.2 
+          : (opts.style === 'yt_long' ? 12.0 
+          : (opts.style === 'explainer' ? 15.0 : 4.5)));
+        cuts.push({
+          clipName: c.name,
+          trimIn: 0,
+          trimOut: Math.min(dur, sliceDur),
+          transition: cuts.length === 0 ? 'cut' : trans
+        });
+        cutIdx++;
+      }
+    });
+  }
 
   return {
     summary: currentLang==='id' 
@@ -3277,6 +3513,60 @@ function applyCanvasTransition(ctx, canvas, type, progress, v, x, y, w, h){
       try{ ctx.drawImage(v, x, y, w, h); }catch(_){}
       ctx.restore();
     }
+  } else if(type === 'zoom'){
+    const zoomScale = 1 + progress * 0.28;
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.scale(zoomScale, zoomScale);
+    ctx.translate(-canvas.width/2, -canvas.height/2);
+    try{ ctx.drawImage(v, x, y, w, h); }catch(_){}
+    const flashAlpha = Math.max(0, (1 - progress) * 0.35);
+    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(2)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else if(type === 'glitch'){
+    ctx.save();
+    const slices = 5;
+    const sliceH = canvas.height / slices;
+    for(let i=0; i<slices; i++){
+      const shiftX = (Math.sin(i * 3.5 + progress * 10) * progress * 28);
+      try{
+        ctx.drawImage(canvas, 0, i * sliceH, canvas.width, sliceH, shiftX, i * sliceH, canvas.width, sliceH);
+      }catch(_){}
+    }
+    ctx.fillStyle = `rgba(0, 255, 255, ${(progress * 0.22).toFixed(2)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else if(type === 'wipe'){
+    ctx.save();
+    const wipePos = (1 - progress) * canvas.width;
+    ctx.fillStyle = '#7c5cff';
+    ctx.fillRect(wipePos - 12, 0, 24, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(wipePos - 3, 0, 6, canvas.height);
+    ctx.restore();
+  } else if(type === 'leak'){
+    ctx.save();
+    const radGrad = ctx.createRadialGradient(
+      canvas.width * 0.75, canvas.height * 0.25, 20,
+      canvas.width * 0.75, canvas.height * 0.25, canvas.width * 0.8
+    );
+    const alpha = Math.min(0.85, progress * 1.1);
+    radGrad.addColorStop(0, `rgba(255, 200, 60, ${alpha.toFixed(2)})`);
+    radGrad.addColorStop(0.5, `rgba(255, 80, 40, ${(alpha * 0.6).toFixed(2)})`);
+    radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = radGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else if(type === 'spin'){
+    const rot = (progress - 0.5) * 0.09;
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.rotate(rot);
+    ctx.scale(1.06, 1.06);
+    ctx.translate(-canvas.width/2, -canvas.height/2);
+    try{ ctx.drawImage(v, x, y, w, h); }catch(_){}
+    ctx.restore();
   } else if(type === 'dip'){
     ctx.save();
     ctx.fillStyle = `rgba(0, 0, 0, ${progress.toFixed(3)})`;
@@ -3326,9 +3616,11 @@ function playClipToCanvas(clip, ctx, canvas, audioCtx, dest, burnCaptions, nextC
       const x = Math.round((canvas.width-w)/2);
       const y = Math.round((canvas.height-h)/2);
 
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      try{ ctx.drawImage(v, x, y, w, h); }catch(e){}
+      if(v.readyState >= 2 && v.videoWidth > 0){
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        try{ ctx.drawImage(v, x, y, w, h); }catch(e){}
+      }
 
       // Render clip visual transition onto canvas
       // 1. Incoming transition onto current clip
@@ -3351,7 +3643,13 @@ function playClipToCanvas(clip, ctx, canvas, audioCtx, dest, burnCaptions, nextC
         }
       }
 
-      if(mediaItem) drawCaptionOnCanvas(ctx, canvas, mediaItem, v.currentTime);
+      if(mediaItem){
+        if(window.drawCaptionOnCanvas){
+          window.drawCaptionOnCanvas(ctx, canvas, mediaItem, v.currentTime);
+        } else {
+          drawCaptionOnCanvas(ctx, canvas, mediaItem, v.currentTime);
+        }
+      }
       raf = requestAnimationFrame(draw);
     }
 
@@ -3441,11 +3739,16 @@ renderTimeline();
 </script>
 
 <!-- Floating Popover for individual cut transitions -->
-<div id="clipTransitionMenu" class="tl-popover hidden">
+<div id="clipTransitionMenu" class="tl-popover hidden" style="max-height:360px;overflow-y:auto">
   <div class="tl-popover-title">Change Cut Transition</div>
   <button type="button" class="tl-popover-item" onclick="selectClipTransition('flash')"><span>⚡</span> Flash Strobe</button>
   <button type="button" class="tl-popover-item" onclick="selectClipTransition('film')"><span>🎞️</span> Film Strip Roll</button>
   <button type="button" class="tl-popover-item" onclick="selectClipTransition('blur')"><span>🌀</span> Motion Blur</button>
+  <button type="button" class="tl-popover-item" onclick="selectClipTransition('zoom')"><span>🔍</span> Kinetic Zoom</button>
+  <button type="button" class="tl-popover-item" onclick="selectClipTransition('glitch')"><span>📺</span> Cyber Glitch</button>
+  <button type="button" class="tl-popover-item" onclick="selectClipTransition('wipe')"><span>🏎️</span> Speed Wipe</button>
+  <button type="button" class="tl-popover-item" onclick="selectClipTransition('leak')"><span>☀️</span> Light Leak</button>
+  <button type="button" class="tl-popover-item" onclick="selectClipTransition('spin')"><span>🔄</span> Whip Spin</button>
   <button type="button" class="tl-popover-item" onclick="selectClipTransition('fade')"><span>✨</span> Crossfade</button>
   <button type="button" class="tl-popover-item" onclick="selectClipTransition('dip')"><span>⬛</span> Dip to Black</button>
   <button type="button" class="tl-popover-item" onclick="selectClipTransition('cut')"><span>✂</span> Straight Cut (None)</button>

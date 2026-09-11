@@ -1,161 +1,663 @@
 /* ClipForge AI — Phase 5 Subtitle Studio
- * Word boxes, keyword highlighting, styles, animations, position controls,
- * and true word timestamps from the Cloud Whisper response.
+ * Real-time word-level captions, kinetic animations, keyword highlights,
+ * custom styling, and perfect synchronization with edited timeline cuts.
  */
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'clipforge.subtitleStudio.v1';
+  const STORAGE_KEY = 'clipforge.subtitleStudio.v2';
   const defaults = {
-    enabled: true, wordBoxes: true, keywordHighlight: true, keywords: '',
-    style: 'karaoke', animation: 'pop', positionX: 50, positionY: 82,
-    fontSize: 5.0, maxWords: 5, boxRadius: 10, boxOpacity: 0.78,
-    textTransform: 'uppercase', keywordColor: '#FFD166', activeColor: '#7c5cff', textColor: '#ffffff'
+    enabled: true,
+    wordBoxes: true,
+    keywordHighlight: true,
+    keywords: 'hook, secret, viral, amazing, profit, subscribe, listen, watch, stop, must, now',
+    style: 'karaoke', // karaoke | boxed | clean | outline
+    animation: 'pop', // pop | bounce | slide | fade | none
+    positionX: 50,
+    positionY: 82,
+    fontSize: 5.2,
+    maxWords: 5,
+    boxRadius: 8,
+    boxOpacity: 0.82,
+    textTransform: 'uppercase',
+    keywordColor: '#ffd166',
+    activeColor: '#7c5cff',
+    textColor: '#ffffff'
   };
-  let settings = loadSettings();
-  let selectedWord = null, lastActiveKey = '';
 
-  function loadSettings(){ try{return {...defaults,...JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}}catch{return {...defaults}} }
-  function saveSettings(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(settings))}catch{}}
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const currentMedia=()=>(window.media&&window.media.length)?window.media:(window.getMedia?window.getMedia():[]);
-  const currentTimeline=()=>(window.timeline&&window.timeline.length)?window.timeline:(window.getTimeline?window.getTimeline():[]);
-  const mediaForClip=c=>{
-    const list = currentMedia();
-    return list.find(m=>m.id===c?.mediaId)||list.find(m=>m.url===c?.url)||(c?.transcript?c:null);
-  };
-  function activeClipAt(elapsed){
-    const v=document.getElementById('previewVideo');
-    const tl=currentTimeline();
-    // 1. Sequence playback mode
-    if(window.seq && window.seq.mode==='sequence' && tl.length){
-      let acc=0;
-      for(const clip of tl){
-        const d=Math.max(.01,(clip.trimOut??clip.duration)-(clip.trimIn??0));
-        if(elapsed<=acc+d+.05){
-          return {clip,sourceTime:(clip.trimIn||0)+Math.max(0,elapsed-acc)};
-        }
-        acc+=d;
-      }
-      if(tl[window.seq.index]){
-        const c=tl[window.seq.index];
-        return {clip:c,sourceTime:v?v.currentTime:(c.trimIn||0)};
-      }
+  let settings = loadSettings();
+  let lastActiveClipId = null;
+  let lastActiveWordIndex = -1;
+
+  function loadSettings(){
+    try{
+      return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
+    }catch{
+      return { ...defaults };
     }
-    // 2. Single clip or idle preview
-    if(v && v.src){
-      const m=currentMedia().find(x=>x.url===v.src);
-      if(m) return {clip:{id:'m_prev',mediaId:m.id,duration:m.duration,trimIn:0,trimOut:m.duration},sourceTime:v.currentTime};
-    }
-    // 3. Fallback to first timeline clip if video loaded
-    if(tl.length && v){
-      const c=tl.find(x=>x.url===v.src)||tl[0];
-      return {clip:c,sourceTime:v.currentTime};
-    }
-    return null;
   }
+  function saveSettings(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }catch(_){}
+  }
+
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+
+  function getActiveTimelineClip(){
+    const tl = (window.timeline && window.timeline.length) ? window.timeline : (window.getTimeline ? window.getTimeline() : []);
+    if(!tl.length) return null;
+    const seq = window.seq || (window.getSeq ? window.getSeq() : null);
+    if(seq && seq.mode === 'sequence' && tl[seq.index]){
+      return tl[seq.index];
+    }
+    const v = document.getElementById('previewVideo');
+    if(v && v.src){
+      const found = tl.find(c => c.url === v.src);
+      if(found) return found;
+    }
+    return tl[0];
+  }
+
+  function getMediaForClip(c){
+    if(!c) return null;
+    const list = (window.media && window.media.length) ? window.media : (window.getMedia ? window.getMedia() : []);
+    return list.find(m => m.id === c.mediaId) || list.find(m => m.url === c.url) || (c.transcript ? c : null);
+  }
+
+  function keywords(){
+    return (settings.keywords || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+  function isKeyword(word){
+    const w = String(word || '').toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+    return keywords().some(k => w === k || w.includes(k) || k.includes(w));
+  }
+
   function findActiveWordIndex(words, time){
-    if(!words||!words.length)return -1;
-    // 1. Exact match
-    const exact=words.findIndex(w=>time>=Number(w.start)&&time<Number(w.end));
-    if(exact>=0)return exact;
-    // 2. Small gap tolerance between words (up to 0.75s pause)
-    for(let i=0;i<words.length;i++){
-      const w=words[i];
-      if(time>=Number(w.start)&&time<=Number(w.end)+0.75)return i;
-      if(i<words.length-1&&time>Number(w.end)&&time<Number(words[i+1].start)){
-        return (time-Number(w.end)<Number(words[i+1].start)-time)?i:i+1;
+    if(!words || !words.length) return -1;
+    // 1. Exact match within start and end
+    for(let i = 0; i < words.length; i++){
+      const s = Number(words[i].start || 0);
+      const e = Number(words[i].end || s + 0.4);
+      if(time >= s && time <= e){
+        return i;
       }
     }
-    // 3. Just before first word
-    if(time>=Math.max(0,Number(words[0].start)-0.4)&&time<Number(words[0].start))return 0;
+    // 2. Pause/gap tolerance between words (up to 0.65s)
+    for(let i = 0; i < words.length; i++){
+      const s = Number(words[i].start || 0);
+      const e = Number(words[i].end || s + 0.4);
+      if(time >= s && time <= e + 0.65){
+        return i;
+      }
+      if(i < words.length - 1){
+        const nextS = Number(words[i + 1].start || 0);
+        if(time > e && time < nextS){
+          return (time - e < nextS - time) ? i : i + 1;
+        }
+      }
+    }
+    // 3. Right before first word
+    if(words.length && time >= Math.max(0, Number(words[0].start || 0) - 0.4) && time < Number(words[0].start || 0)){
+      return 0;
+    }
     return -1;
   }
-  function keywords(){return settings.keywords.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean)}
-  function isKeyword(word){const w=String(word||'').toLowerCase().replace(/[^\p{L}\p{N}']/gu,'');return keywords().some(k=>w===k||w.includes(k))}
-  function injectStyles(){if(document.getElementById('phase5SubtitleStyles'))return;const s=document.createElement('style');s.id='phase5SubtitleStyles';s.textContent=`
-#subtitleStudioPanel{border:1px solid var(--border);background:var(--panel-2);border-radius:10px;margin-bottom:10px;overflow:hidden}.ss-head{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:1px solid var(--border)}.ss-head strong{font-size:12px}.ss-chip{font-size:9px;color:var(--ok);background:rgba(52,211,153,.12);padding:2px 6px;border-radius:999px}.ss-body{padding:10px}.ss-row{display:flex;align-items:center;gap:8px;margin:7px 0}.ss-row label{font-size:10.5px;color:var(--muted);min-width:70px}.ss-row input[type=range]{flex:1}.ss-row select,.ss-row input[type=text]{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px;font-size:11px}.ss-value{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--muted-2);width:38px;text-align:right}.ss-actions{display:flex;gap:6px;margin-top:9px}.ss-actions button{flex:1}.ss-word-list{max-height:150px;overflow:auto;border-top:1px solid var(--border);margin-top:8px;padding-top:7px}.ss-word{display:inline-flex;gap:5px;align-items:center;margin:2px;padding:3px 5px;border:1px solid transparent;border-radius:5px;background:var(--bg);font-size:10px;cursor:pointer;color:var(--text)}.ss-word:hover,.ss-word.selected{border-color:var(--ai)}.ss-word time{color:var(--muted-2);font-family:'IBM Plex Mono',monospace;font-size:8px}.subtitle-overlay{transition:transform .12s ease,opacity .12s ease}.subtitle-overlay.ss-pop .word{animation:ssPop .22s ease both}.subtitle-overlay.ss-bounce .word{animation:ssBounce .36s ease both}.subtitle-overlay.ss-slide .word{animation:ssSlide .28s ease both}.subtitle-overlay.ss-fade .word{animation:ssFade .24s ease both}@keyframes ssPop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}@keyframes ssBounce{0%{opacity:0;transform:translateY(12px) scale(.8)}65%{transform:translateY(-3px) scale(1.04)}100%{opacity:1;transform:none}}@keyframes ssSlide{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}@keyframes ssFade{from{opacity:0}to{opacity:1}}.ss-toggle{appearance:none;width:34px;height:19px;border-radius:12px;background:#333;position:relative;outline:none;cursor:pointer}.ss-toggle:checked{background:var(--ai)}.ss-toggle:after{content:'';position:absolute;width:15px;height:15px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s}.ss-toggle:checked:after{left:17px}`;document.head.appendChild(s)}
-  function makePanel(){injectStyles();const right=document.getElementById('right');if(!right||document.getElementById('subtitleStudioPanel'))return;const panel=document.createElement('div');panel.id='subtitleStudioPanel';panel.innerHTML=`<div class="ss-head"><strong>💬 Subtitle Studio</strong><span class="ss-chip">LIVE</span></div><div class="ss-body"><div class="ss-row"><label>Subtitles</label><input class="ss-toggle" id="ssEnabled" type="checkbox"></div><div class="ss-row"><label>Word boxes</label><input class="ss-toggle" id="ssBoxes" type="checkbox"></div><div class="ss-row"><label>Keyword</label><input class="ss-toggle" id="ssKeyword" type="checkbox"></div><div class="ss-row"><label>Keywords</label><input id="ssKeywords" type="text" placeholder="hook, amazing, important"></div><div class="ss-row"><label>Style</label><select id="ssStyle"><option value="karaoke">Karaoke</option><option value="boxed">Boxed</option><option value="clean">Clean</option><option value="outline">Outline</option></select></div><div class="ss-row"><label>Animation</label><select id="ssAnimation"><option value="pop">Pop</option><option value="bounce">Bounce</option><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">None</option></select></div><div class="ss-row"><label>Position X</label><input id="ssX" type="range" min="8" max="92" step="1"><span class="ss-value" id="ssXV"></span></div><div class="ss-row"><label>Position Y</label><input id="ssY" type="range" min="8" max="92" step="1"><span class="ss-value" id="ssYV"></span></div><div class="ss-row"><label>Font size</label><input id="ssFont" type="range" min="2.5" max="8" step=".1"><span class="ss-value" id="ssFontV"></span></div><div class="ss-row"><label>Max words</label><input id="ssWords" type="range" min="1" max="8" step="1"><span class="ss-value" id="ssWordsV"></span></div><div class="ss-actions"><button class="apply-btn" id="ssReset">Reset</button><button class="apply-btn" id="ssApply">Apply</button></div><div class="ss-word-list" id="ssWordList"><span style="font-size:10px;color:var(--muted-2)">Run Auto Transcript to load real word timestamps.</span></div></div>`;right.prepend(panel);bindPanel(panel);syncPanel()}
-  function bindPanel(panel){const $=id=>panel.querySelector('#'+id);const bind=(id,key,transform=v=>v)=>$(id).addEventListener('input',e=>{settings[key]=transform(e.target.value);saveSettings();syncPanel();renderOverlay()});$('ssEnabled').addEventListener('change',e=>{settings.enabled=e.target.checked;saveSettings();renderOverlay()});$('ssBoxes').addEventListener('change',e=>{settings.wordBoxes=e.target.checked;saveSettings();renderOverlay()});$('ssKeyword').addEventListener('change',e=>{settings.keywordHighlight=e.target.checked;saveSettings();renderOverlay()});bind('ssKeywords','keywords');bind('ssStyle','style');bind('ssAnimation','animation');bind('ssX','positionX',Number);bind('ssY','positionY',Number);bind('ssFont','fontSize',Number);bind('ssWords','maxWords',Number);$('ssReset').addEventListener('click',()=>{settings={...defaults};saveSettings();syncPanel();renderOverlay()});$('ssApply').addEventListener('click',()=>{saveSettings();refreshWordList();renderOverlay();window.showToast?.('Subtitle style applied')})}
-  function syncPanel(){const p=document.getElementById('subtitleStudioPanel');if(!p)return;const $=id=>p.querySelector('#'+id);$('ssEnabled').checked=!!settings.enabled;$('ssBoxes').checked=!!settings.wordBoxes;$('ssKeyword').checked=!!settings.keywordHighlight;$('ssKeywords').value=settings.keywords;$('ssStyle').value=settings.style;$('ssAnimation').value=settings.animation;$('ssX').value=settings.positionX;$('ssY').value=settings.positionY;$('ssFont').value=settings.fontSize;$('ssWords').value=settings.maxWords;$('ssXV').textContent=settings.positionX+'%';$('ssYV').textContent=settings.positionY+'%';$('ssFontV').textContent=settings.fontSize.toFixed(1)+'%';$('ssWordsV').textContent=settings.maxWords;refreshWordList()}
-  function findCurrentWords(){const tl=currentTimeline();if(!tl.length)return [];const hit=activeClipAt(Number(window.seq?.elapsed||0));if(!hit)return [];return mediaForClip(hit.clip)?.transcript||[]}
-  function refreshWordList(){const p=document.getElementById('ssWordList');if(!p)return;const words=findCurrentWords();if(!words.length){p.innerHTML='<span style="font-size:10px;color:var(--muted-2)">Run Auto Transcript to load real word timestamps.</span>';return}p.innerHTML=words.map((w,i)=>`<button class="ss-word" data-i="${i}"><time>${fmt(w.start)}</time>${esc(w.word)}</button>`).join('');p.querySelectorAll('.ss-word').forEach(b=>b.addEventListener('click',()=>{const w=words[Number(b.dataset.i)];selectedWord=w;const hit=activeClipAt(Number(window.seq?.elapsed||0));if(hit&&window.seekSequence)window.seekSequence(timelineElapsedToClip(hit.clip,w.start))}))}
-  function timelineElapsedToClip(clip,sourceTime){let acc=0;for(const c of currentTimeline()){if(c===clip)return acc+Math.max(0,sourceTime-(c.trimIn||0));acc+=Math.max(.01,(c.trimOut||c.duration)-(c.trimIn||0))}return acc}
-  function fmt(s){s=Math.max(0,Number(s)||0);return `${String(Math.floor(s/60)).padStart(2,'0')}:${(s%60).toFixed(2).padStart(5,'0')}`}
-  function renderOverlay(){
-    const overlay=document.getElementById('subtitleOverlay');
-    if(!overlay)return;
-    if(!settings.enabled){overlay.classList.add('hidden');return}
-    const hit=activeClipAt(Number(window.seq?.elapsed||0));
-    if(!hit){overlay.classList.add('hidden');return}
-    const m=mediaForClip(hit.clip),words=m?.transcript||[];
-    if(!words.length){overlay.classList.add('hidden');return}
-    const idx=findActiveWordIndex(words, hit.sourceTime);
-    if(idx<0){overlay.classList.add('hidden');return}
-    const start=Math.max(0,idx-Math.floor(settings.maxWords/2)),visible=words.slice(start,start+settings.maxWords);
-    overlay.className='subtitle-overlay ss-'+settings.animation;
-    overlay.style.left=settings.positionX+'%';
-    overlay.style.bottom=(100-settings.positionY)+'%';
-    overlay.style.transform='translateX(-50%)';
-    overlay.style.maxWidth='90%';
-    overlay.style.gap='6px';
-    overlay.innerHTML=visible.map((w,i)=>{
-      const active=start+i===idx,kw=settings.keywordHighlight&&isKeyword(w.word);
-      let style=`font-size:clamp(12px,${settings.fontSize}vw,72px);text-transform:${settings.textTransform};`;
-      if(kw)style+=`color:${settings.keywordColor};`;
-      if(settings.wordBoxes)style+=`background:${active?settings.activeColor:'rgba(0,0,0,'+settings.boxOpacity+')'};border-radius:${settings.boxRadius}px;`;
-      else if(settings.style==='outline')style+='background:transparent;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000;';
-      else style+='background:transparent;';
-      return `<span class="word${active?' active':''}${kw?' keyword':''}" style="${style}" data-word-index="${start+i}">${esc(w.word)}</span>`
-    }).join('');
-    overlay.classList.remove('hidden');
-    const key=`${m.id}:${idx}:${settings.style}:${settings.animation}`;
-    if(key!==lastActiveKey){lastActiveKey=key;void overlay.offsetWidth}
+
+  function injectStyles(){
+    if(document.getElementById('phase5SubtitleStyles')) return;
+    const s = document.createElement('style');
+    s.id = 'phase5SubtitleStyles';
+    s.textContent = `
+#subtitleStudioPanel{
+  border:1px solid var(--border);
+  background:var(--panel);
+  border-radius:10px;
+  margin-bottom:12px;
+  overflow:hidden;
+  box-shadow:0 4px 16px rgba(0,0,0,.25);
+}
+.ss-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel-2);
+}
+.ss-head-left{display:flex;align-items:center;gap:7px;}
+.ss-head-title{font-size:12px;font-weight:700;color:var(--text);}
+.ss-chip{font-size:9px;font-weight:700;color:var(--ok);background:rgba(52,211,153,.15);padding:2px 7px;border-radius:999px;}
+.ss-body{padding:12px;}
+.ss-row{display:flex;align-items:center;gap:8px;margin:8px 0;}
+.ss-row label{font-size:11px;color:var(--muted);min-width:76px;flex:none;}
+.ss-row input[type=range]{flex:1;accent-color:var(--ai);}
+.ss-row select, .ss-row input[type=text]{
+  flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:6px 8px;font-size:11px;outline:none;
+}
+.ss-row select:focus, .ss-row input[type=text]:focus{border-color:var(--ai);}
+.ss-value{font-family:ui-monospace,monospace;font-size:10px;color:var(--muted-2);width:42px;text-align:right;}
+.ss-actions{display:flex;gap:6px;margin-top:10px;}
+.ss-actions button{flex:1;}
+.ss-word-list-wrap{
+  margin-top:12px;padding-top:10px;border-top:1px solid var(--border);
+}
+.ss-word-list-header{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;
+  font-size:10.5px;color:var(--muted);font-weight:600;
+}
+.ss-word-list{
+  max-height:160px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:6px;display:flex;flex-wrap:wrap;gap:4px;
+}
+.ss-word{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border-radius:5px;
+  background:var(--panel-2);border:1px solid var(--border);font-size:10.5px;color:var(--text);
+  cursor:pointer;transition:all .15s;line-height:1.2;
+}
+.ss-word:hover{border-color:var(--ai);background:var(--ai-dim);}
+.ss-word.is-active{
+  border-color:var(--ai);background:var(--ai);color:#fff;font-weight:700;
+  box-shadow:0 0 8px rgba(124,92,255,.5);
+}
+.ss-word.is-trimmed{opacity:.45;text-decoration:line-through;}
+.ss-word time{font-family:ui-monospace,monospace;font-size:8.5px;opacity:.7;}
+
+/* Subtitle overlay styling */
+.subtitle-overlay{
+  position:absolute;pointer-events:none;z-index:60;display:flex;flex-wrap:wrap;
+  justify-content:center;align-items:center;text-align:center;
+  transition:left .1s ease, bottom .1s ease;
+}
+.subtitle-overlay .word{
+  display:inline-block;padding:3px 8px;margin:2px 3px;font-weight:800;
+  letter-spacing:.3px;line-height:1.2;transition:transform .12s cubic-bezier(.2,1,.3,1), background-color .15s;
+}
+.subtitle-overlay .word.active{
+  transform:scale(1.08);
+}
+.subtitle-overlay.ss-pop .word.active{
+  animation:ssPop .24s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+.subtitle-overlay.ss-bounce .word.active{
+  animation:ssBounce .35s cubic-bezier(.2,.8,.3,1.3) both;
+}
+.subtitle-overlay.ss-slide .word.active{
+  animation:ssSlide .22s ease-out both;
+}
+.subtitle-overlay.ss-fade .word.active{
+  animation:ssFade .2s ease-out both;
+}
+@keyframes ssPop{
+  0%{transform:scale(.75);opacity:.6;}
+  70%{transform:scale(1.15);}
+  100%{transform:scale(1.08);opacity:1;}
+}
+@keyframes ssBounce{
+  0%{transform:translateY(10px) scale(.8);opacity:0;}
+  60%{transform:translateY(-4px) scale(1.12);}
+  100%{transform:translateY(0) scale(1.08);opacity:1;}
+}
+@keyframes ssSlide{
+  0%{transform:translateX(15px);opacity:0;}
+  100%{transform:translateX(0) scale(1.08);opacity:1;}
+}
+@keyframes ssFade{
+  0%{opacity:0;}
+  100%{opacity:1;}
+}
+.ss-toggle{
+  appearance:none;width:34px;height:18px;border-radius:12px;background:#333;
+  position:relative;outline:none;cursor:pointer;transition:background .2s;flex:none;
+}
+.ss-toggle:checked{background:var(--ai);}
+.ss-toggle:after{
+  content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;
+  background:#fff;border-radius:50%;transition:.15s;
+}
+.ss-toggle:checked:after{left:18px;}
+`;
+    document.head.appendChild(s);
   }
-  function hookPlayback(){const v=document.getElementById('previewVideo');if(!v)return;v.addEventListener('timeupdate',()=>{renderOverlay();refreshWordList()},{passive:true});window.addEventListener('clipforge:subtitle-refresh',renderOverlay)}
-  window.drawCaptionOnCanvas=function(ctx,canvas,m,tInClip){
-    if(!settings.enabled)return;
-    const words=m?.transcript||[];
-    if(!words.length)return;
-    const idx=findActiveWordIndex(words, tInClip);
-    if(idx<0)return;
-    const start=Math.max(0,idx-Math.floor(settings.maxWords/2)),visible=words.slice(start,start+settings.maxWords);
-    const fs=Math.round(canvas.width*(settings.fontSize/100));
-    ctx.save();
-    ctx.font=`800 ${fs}px Inter,sans-serif`;
-    ctx.textBaseline='middle';
-    ctx.textAlign='left';
-    const gap=Math.round(fs*.28),padX=Math.round(fs*.34);
-    const boxes=visible.map((w,i)=>({
-      w,
-      active:start+i===idx,
-      kw:settings.keywordHighlight&&isKeyword(w.word),
-      width:ctx.measureText(String(w.word).toUpperCase()).width+padX*2
-    }));
-    const total=boxes.reduce((n,b)=>n+b.width,0)+gap*Math.max(0,boxes.length-1);
-    let x=canvas.width*(settings.positionX/100)-total/2;
-    const y=canvas.height*(settings.positionY/100);
-    boxes.forEach(b=>{
-      const h=fs*1.35;
-      if(settings.wordBoxes){
-        ctx.fillStyle=b.active?settings.activeColor:`rgba(0,0,0,${settings.boxOpacity})`;
-        round(ctx,x,y-h/2,b.width,h,settings.boxRadius);
-        ctx.fill();
-      }else if(settings.style==='outline'){
-        ctx.strokeStyle='rgba(0,0,0,.85)';
-        ctx.lineWidth=Math.max(3,fs*.12);
-        ctx.strokeText(String(b.w.word).toUpperCase(),x+padX,y);
-      }
-      ctx.fillStyle=b.kw?settings.keywordColor:settings.textColor;
-      ctx.fillText(String(b.w.word).toUpperCase(),x+padX,y);
-      x+=b.width+gap;
+
+  function makePanel(){
+    injectStyles();
+    // Check if container in #tabSubtitlesBody or #right exists
+    let container = document.getElementById('tabSubtitlesBody');
+    if(!container) container = document.getElementById('right');
+    if(!container || document.getElementById('subtitleStudioPanel')) return;
+
+    const panel = document.createElement('div');
+    panel.id = 'subtitleStudioPanel';
+    panel.innerHTML = `
+      <div class="ss-head">
+        <div class="ss-head-left">
+          <span>💬</span>
+          <span class="ss-head-title">Subtitle Studio</span>
+          <span class="ss-chip">AUTO-SYNC</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:10px;color:var(--muted)">Active</label>
+          <input class="ss-toggle" id="ssEnabled" type="checkbox" title="Toggle Subtitles">
+        </div>
+      </div>
+      <div class="ss-body">
+        <div class="ss-row">
+          <label>Style Preset</label>
+          <select id="ssStyle">
+            <option value="karaoke">✨ Karaoke Highlight</option>
+            <option value="boxed">📦 Word Boxes</option>
+            <option value="clean">🪶 Minimal Clean</option>
+            <option value="outline">🔲 High-Contrast Outline</option>
+          </select>
+        </div>
+        <div class="ss-row">
+          <label>Animation</label>
+          <select id="ssAnimation">
+            <option value="pop">⚡ Pop Pulse</option>
+            <option value="bounce">🎈 Bounce</option>
+            <option value="slide">💨 Slide In</option>
+            <option value="fade">✨ Smooth Fade</option>
+            <option value="none">⏹ None (Static)</option>
+          </select>
+        </div>
+        <div class="ss-row">
+          <label>Word Boxes</label>
+          <input class="ss-toggle" id="ssBoxes" type="checkbox">
+          <label style="min-width:65px;margin-left:8px">Keywords</label>
+          <input class="ss-toggle" id="ssKeyword" type="checkbox">
+        </div>
+        <div class="ss-row">
+          <label>Keywords</label>
+          <input id="ssKeywords" type="text" placeholder="hook, secret, viral, best">
+        </div>
+        <div class="ss-row">
+          <label>Position Y</label>
+          <input id="ssY" type="range" min="15" max="92" step="1">
+          <span class="ss-value" id="ssYV">82%</span>
+        </div>
+        <div class="ss-row">
+          <label>Font Size</label>
+          <input id="ssFont" type="range" min="2.5" max="8.0" step="0.1">
+          <span class="ss-value" id="ssFontV">5.2vw</span>
+        </div>
+        <div class="ss-row">
+          <label>Max Words</label>
+          <input id="ssWords" type="range" min="1" max="8" step="1">
+          <span class="ss-value" id="ssWordsV">5</span>
+        </div>
+        <div class="ss-actions">
+          <button type="button" class="btn-ghost" id="ssReset" style="font-size:11px;padding:6px">↺ Reset</button>
+          <button type="button" class="btn-primary" id="ssApply" style="font-size:11px;padding:6px">✓ Save Style</button>
+        </div>
+        <div class="ss-word-list-wrap">
+          <div class="ss-word-list-header">
+            <span>Clip Spoken Words (<span id="ssWordCount">0</span>)</span>
+            <span style="font-size:9.5px;color:var(--muted-2)">Click word to jump</span>
+          </div>
+          <div class="ss-word-list" id="ssWordList">
+            <span style="font-size:10px;color:var(--muted-2);padding:4px">
+              Import clips and run Auto Transcript or Auto-Edit to view live word timestamps.
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.prepend(panel);
+    bindPanel(panel);
+    syncPanel();
+  }
+
+  function bindPanel(panel){
+    const $ = id => panel.querySelector('#' + id);
+    const bind = (id, key, transform = v => v) => {
+      const el = $(id);
+      if(!el) return;
+      el.addEventListener('input', e => {
+        settings[key] = transform(e.target.value);
+        saveSettings();
+        syncPanel(false);
+        renderCurrentOverlay();
+      });
+    };
+
+    $('ssEnabled').addEventListener('change', e => {
+      settings.enabled = e.target.checked;
+      saveSettings();
+      renderCurrentOverlay();
     });
+    $('ssBoxes').addEventListener('change', e => {
+      settings.wordBoxes = e.target.checked;
+      saveSettings();
+      renderCurrentOverlay();
+    });
+    $('ssKeyword').addEventListener('change', e => {
+      settings.keywordHighlight = e.target.checked;
+      saveSettings();
+      renderCurrentOverlay();
+    });
+
+    bind('ssKeywords', 'keywords');
+    bind('ssStyle', 'style');
+    bind('ssAnimation', 'animation');
+    bind('ssY', 'positionY', Number);
+    bind('ssFont', 'fontSize', Number);
+    bind('ssWords', 'maxWords', Number);
+
+    $('ssReset').addEventListener('click', () => {
+      settings = { ...defaults };
+      saveSettings();
+      syncPanel();
+      renderCurrentOverlay();
+      window.showToast?.('Subtitle settings reset');
+    });
+
+    $('ssApply').addEventListener('click', () => {
+      saveSettings();
+      renderCurrentOverlay();
+      window.showToast?.('Subtitle style applied to preview & export');
+    });
+  }
+
+  function syncPanel(updateInputs = true){
+    const p = document.getElementById('subtitleStudioPanel');
+    if(!p) return;
+    const $ = id => p.querySelector('#' + id);
+    if(updateInputs){
+      $('ssEnabled').checked = !!settings.enabled;
+      $('ssBoxes').checked = !!settings.wordBoxes;
+      $('ssKeyword').checked = !!settings.keywordHighlight;
+      $('ssKeywords').value = settings.keywords || '';
+      $('ssStyle').value = settings.style;
+      $('ssAnimation').value = settings.animation;
+      $('ssY').value = settings.positionY;
+      $('ssFont').value = settings.fontSize;
+      $('ssWords').value = settings.maxWords;
+    }
+    $('ssYV').textContent = settings.positionY + '%';
+    $('ssFontV').textContent = settings.fontSize.toFixed(1) + 'vw';
+    $('ssWordsV').textContent = settings.maxWords;
+  }
+
+  function refreshWordList(clip, currentTime){
+    const listEl = document.getElementById('ssWordList');
+    if(!listEl) return;
+    const activeClip = clip || getActiveTimelineClip();
+    if(!activeClip){
+      listEl.innerHTML = '<span style="font-size:10px;color:var(--muted-2);padding:4px">No active clip in timeline.</span>';
+      return;
+    }
+
+    const m = getMediaForClip(activeClip);
+    const words = m?.transcript || activeClip.transcript || [];
+    const countEl = document.getElementById('ssWordCount');
+    if(countEl) countEl.textContent = words.length;
+
+    if(!words.length){
+      listEl.innerHTML = '<span style="font-size:10px;color:var(--muted-2);padding:4px">Run Auto Transcript to extract words for this clip.</span>';
+      return;
+    }
+
+    const clipId = activeClip.id || activeClip.mediaId;
+    // Re-render word list DOM only if clip changed or transcript length changed
+    if(lastActiveClipId !== clipId || listEl.querySelectorAll('.ss-word').length !== words.length){
+      lastActiveClipId = clipId;
+      listEl.innerHTML = words.map((w, i) => {
+        const isTrimmed = (w.start < (activeClip.trimIn || 0) || w.end > (activeClip.trimOut || activeClip.duration || Infinity));
+        return `<button type="button" class="ss-word ${isTrimmed ? 'is-trimmed' : ''}" data-idx="${i}" title="${isTrimmed ? 'Trimmed out of final video' : 'Click to jump to ' + fmt(w.start)}">
+          <time>${fmt(w.start)}</time>
+          <span class="w-text" contenteditable="true" spellcheck="false">${esc(w.word)}</span>
+        </button>`;
+      }).join('');
+
+      // Bind word click to seek
+      listEl.querySelectorAll('.ss-word').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          if(e.target.classList.contains('w-text') && e.target.isContentEditable && document.activeElement === e.target){
+            return; // let user edit text
+          }
+          const idx = Number(btn.dataset.idx);
+          const word = words[idx];
+          if(!word) return;
+          const tl = (window.timeline && window.timeline.length) ? window.timeline : [];
+          let acc = 0;
+          for(let k = 0; k < tl.length; k++){
+            const c = tl[k];
+            if(c.id === activeClip.id || c === activeClip){
+              const dur = Math.max(0.2, c.trimOut - c.trimIn);
+              const offsetInClip = Math.max(0, Math.min(dur, word.start - c.trimIn));
+              if(window.seekSequence) window.seekSequence(acc + offsetInClip);
+              return;
+            }
+            acc += Math.max(0.2, c.trimOut - c.trimIn);
+          }
+        });
+
+        // Bind live text editing
+        const textSpan = btn.querySelector('.w-text');
+        if(textSpan){
+          textSpan.addEventListener('blur', () => {
+            const idx = Number(btn.dataset.idx);
+            if(words[idx]){
+              words[idx].word = textSpan.textContent.trim();
+              renderCurrentOverlay();
+            }
+          });
+        }
+      });
+    }
+
+    // Update active highlight on time
+    const t = currentTime != null ? currentTime : (document.getElementById('previewVideo')?.currentTime || 0);
+    const activeIdx = findActiveWordIndex(words, t);
+    if(activeIdx !== lastActiveWordIndex){
+      lastActiveWordIndex = activeIdx;
+      const allButtons = listEl.querySelectorAll('.ss-word');
+      allButtons.forEach((b, i) => {
+        const isAct = (i === activeIdx);
+        b.classList.toggle('is-active', isAct);
+        if(isAct){
+          b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        }
+      });
+    }
+  }
+
+  function fmt(s){
+    s = Math.max(0, Number(s) || 0);
+    const m = Math.floor(s / 60);
+    const sec = (s % 60).toFixed(1);
+    return `${String(m).padStart(2, '0')}:${sec.padStart(4, '0')}`;
+  }
+
+  // Core render function called directly by editor
+  function renderOverlayDirect(overlay, words, tInSourceClip, timelineClip){
+    if(!overlay) return;
+    if(!settings.enabled || !words || !words.length){
+      overlay.classList.add('hidden');
+      return;
+    }
+
+    // Check trim bounds: if video is outside [trimIn, trimOut], hide subtitles
+    if(timelineClip){
+      const tIn = timelineClip.trimIn || 0;
+      const tOut = timelineClip.trimOut || timelineClip.duration || Infinity;
+      if(tInSourceClip < tIn - 0.15 || tInSourceClip > tOut + 0.15){
+        overlay.classList.add('hidden');
+        return;
+      }
+    }
+
+    const idx = findActiveWordIndex(words, tInSourceClip);
+    if(idx < 0){
+      overlay.classList.add('hidden');
+      return;
+    }
+
+    const windowWords = Math.max(1, settings.maxWords || 5);
+    const half = Math.floor(windowWords / 2);
+    const start = Math.max(0, idx - half);
+    const visible = words.slice(start, start + windowWords);
+
+    overlay.className = `subtitle-overlay ss-${settings.animation || 'pop'}`;
+    overlay.style.left = (settings.positionX || 50) + '%';
+    overlay.style.bottom = (100 - (settings.positionY || 82)) + '%';
+    overlay.style.transform = 'translateX(-50%)';
+    overlay.style.maxWidth = '92%';
+
+    overlay.innerHTML = visible.map((w, i) => {
+      const active = (start + i === idx);
+      const kw = settings.keywordHighlight && isKeyword(w.word);
+
+      let style = `font-size:clamp(14px, ${settings.fontSize || 5.2}vw, 56px);text-transform:${settings.textTransform || 'uppercase'};`;
+      if(kw){
+        style += `color:${settings.keywordColor || '#ffd166'};`;
+      } else {
+        style += `color:${settings.textColor || '#ffffff'};`;
+      }
+
+      if(settings.wordBoxes){
+        const bg = active ? (settings.activeColor || '#7c5cff') : `rgba(10, 10, 15, ${settings.boxOpacity || 0.82})`;
+        style += `background:${bg};border-radius:${settings.boxRadius || 8}px;`;
+      } else if(settings.style === 'outline'){
+        style += 'background:transparent;text-shadow:-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 3px 12px rgba(0,0,0,.8);';
+      } else if(settings.style === 'karaoke'){
+        const bg = active ? (settings.activeColor || '#7c5cff') : 'transparent';
+        style += `background:${bg};border-radius:6px;${active ? 'color:#fff;' : ''}`;
+      } else {
+        style += 'background:transparent;text-shadow:0 2px 8px rgba(0,0,0,.9);';
+      }
+
+      return `<span class="word ${active ? 'active' : ''} ${kw ? 'keyword' : ''}" style="${style}">${esc(w.word)}</span>`;
+    }).join('');
+
+    overlay.classList.remove('hidden');
+  }
+
+  function renderCurrentOverlay(){
+    const overlay = document.getElementById('subtitleOverlay');
+    if(!overlay) return;
+    const activeClip = getActiveTimelineClip();
+    if(!activeClip){
+      overlay.classList.add('hidden');
+      return;
+    }
+    const m = getMediaForClip(activeClip);
+    const words = m?.transcript || activeClip.transcript || [];
+    const v = document.getElementById('previewVideo');
+    const t = v ? v.currentTime : (activeClip.trimIn || 0);
+    renderOverlayDirect(overlay, words, t, activeClip);
+    refreshWordList(activeClip, t);
+  }
+
+  // Canvas drawing for high-resolution export
+  function drawCaptionOnCanvas(ctx, canvas, mediaItem, tInClip){
+    if(!settings.enabled || !mediaItem) return;
+    const words = mediaItem.transcript || (mediaItem.highlights && mediaItem.highlights.transcript) || [];
+    if(!words || !words.length) return;
+
+    const idx = findActiveWordIndex(words, tInClip);
+    if(idx < 0) return;
+
+    const windowWords = Math.max(1, settings.maxWords || 5);
+    const start = Math.max(0, idx - Math.floor(windowWords / 2));
+    const visible = words.slice(start, start + windowWords);
+
+    const isPortrait = canvas.height >= canvas.width;
+    const fs = Math.round(canvas.width * ((settings.fontSize || 5.2) / 100));
+
+    ctx.save();
+    ctx.font = `800 ${fs}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+
+    const gap = Math.round(fs * 0.28);
+    const padX = Math.round(fs * 0.38);
+
+    const boxes = visible.map((w, i) => {
+      const active = (start + i === idx);
+      const kw = settings.keywordHighlight && isKeyword(w.word);
+      const text = String(w.word || '').toUpperCase();
+      return {
+        w,
+        text,
+        active,
+        kw,
+        width: ctx.measureText(text).width + padX * 2
+      };
+    });
+
+    const total = boxes.reduce((a, b) => a + b.width, 0) + gap * Math.max(0, boxes.length - 1);
+    let x = Math.round(canvas.width * ((settings.positionX || 50) / 100) - total / 2);
+    const y = Math.round(canvas.height * ((settings.positionY || 82) / 100));
+
+    boxes.forEach(b => {
+      const h = Math.round(fs * 1.4);
+      if(settings.wordBoxes){
+        ctx.fillStyle = b.active ? (settings.activeColor || '#7c5cff') : `rgba(10, 10, 15, ${settings.boxOpacity || 0.82})`;
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 10;
+        round(ctx, x, y - h / 2, b.width, h, settings.boxRadius || 8);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else if(settings.style === 'outline'){
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.lineWidth = Math.max(3, Math.round(fs * 0.12));
+        ctx.strokeText(b.text, x + padX, y);
+      } else if(settings.style === 'karaoke' && b.active){
+        ctx.fillStyle = settings.activeColor || '#7c5cff';
+        round(ctx, x, y - h / 2, b.width, h, 6);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = b.kw ? (settings.keywordColor || '#ffd166') : (settings.textColor || '#ffffff');
+      ctx.fillText(b.text, x + padX, y);
+      x += b.width + gap;
+    });
+
     ctx.restore();
+  }
+
+  function round(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Expose global interface
+  window.__subtitleStudio = {
+    renderOverlay: renderOverlayDirect,
+    drawCaptionOnCanvas,
+    getSettings: () => ({ ...settings }),
+    setSettings: (s) => { settings = { ...settings, ...s }; saveSettings(); syncPanel(); renderCurrentOverlay(); },
+    refreshWordList,
+    renderCurrentOverlay,
+    openPanel: () => {
+      makePanel();
+      syncPanel();
+      const p = document.getElementById('subtitleStudioPanel');
+      if(p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
-  window.__studioDrawCaption = window.drawCaptionOnCanvas;
-  window.__subtitleSettings = settings;
-  function round(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
-  const oldRun=window.runAutoTranscript;window.runAutoTranscript=async function(){if(typeof oldRun==='function')await oldRun();makePanel();syncPanel();renderOverlay()};
-  function boot(){makePanel();hookPlayback();setInterval(()=>{if(document.visibilityState==='visible')renderOverlay()},120)}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+  window.drawCaptionOnCanvas = drawCaptionOnCanvas;
+
+  function boot(){
+    makePanel();
+    const v = document.getElementById('previewVideo');
+    if(v){
+      v.addEventListener('timeupdate', () => {
+        renderCurrentOverlay();
+      }, { passive: true });
+    }
+    window.addEventListener('clipforge:subtitle-refresh', renderCurrentOverlay);
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
