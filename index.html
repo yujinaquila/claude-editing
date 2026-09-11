@@ -149,8 +149,20 @@
   .media-tag{display:inline-block;font-size:9.5px;font-weight:700;color:var(--ai);background:var(--ai-dim);
     padding:1px 5px;border-radius:4px;margin-top:2px;}
   .media-add-btn{flex:none;width:24px;height:24px;border-radius:6px;background:var(--ai-dim);color:var(--ai);
-    border:none;font-size:15px;font-weight:700;line-height:1;}
+    border:none;font-size:15px;font-weight:700;line-height:1;cursor:pointer;transition:all .15s;}
   .media-add-btn:hover{background:var(--ai);color:#fff;}
+
+  /* media actions bar & sort controls */
+  .media-actions-bar{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;animation:fadeIn .15s ease;}
+  .media-actions-row{display:flex;align-items:center;gap:6px;}
+  .media-add-all-btn{flex:1;background:var(--ai);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:background .15s;}
+  .media-add-all-btn:hover{background:#6b4be0;}
+  .media-sort-dropdown-wrap{position:relative;}
+  .media-sort-btn{font-size:11px;padding:5px 8px;border-radius:6px;white-space:nowrap;display:flex;align-items:center;gap:4px;}
+  .media-actions-sub{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:10.5px;color:var(--muted);}
+  .media-count-badge{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;color:var(--text);}
+  .media-order-badge{position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.82);color:#fff;font-size:9px;font-weight:700;padding:0px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.25);pointer-events:none;letter-spacing:.2px;line-height:14px;}
+  #tabMediaBody.drag-over{outline:2px dashed var(--ai);background:var(--ai-dim);}
 
   .section-label{font-size:11px;text-transform:none;color:var(--muted);font-weight:600;margin:14px 0 8px;
     display:flex;align-items:center;justify-content:space-between;}
@@ -304,6 +316,7 @@
   /* Popover menus */
   .tl-popover{position:fixed;background:var(--panel);border:1px solid var(--border);
     border-radius:8px;padding:6px;box-shadow:0 12px 30px rgba(0,0,0,.6);z-index:2000;min-width:180px;}
+  .tl-popover.tl-popover-relative{position:absolute;top:calc(100% + 4px);right:0;z-index:2100;}
   .tl-popover-title{font-size:10px;font-weight:700;color:var(--muted);padding:4px 8px;border-bottom:1px solid var(--border);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;}
   .tl-popover-item{width:100%;text-align:left;background:transparent;border:none;color:var(--text);
     padding:6px 8px;border-radius:5px;font-size:11.5px;display:flex;align-items:center;gap:8px;cursor:pointer;}
@@ -331,14 +344,23 @@
   }
   .transition-overlay.tr-blur-active{
     animation:liveBlurAnim .46s ease-out forwards;
-    backdrop-filter:blur(16px) brightness(1.2);
-    -webkit-backdrop-filter:blur(16px) brightness(1.2);
-    background:rgba(124,92,255,.14);
+    backdrop-filter:blur(22px) brightness(1.2) saturate(1.2);
+    -webkit-backdrop-filter:blur(22px) brightness(1.2) saturate(1.2);
+    background:radial-gradient(circle, rgba(124,92,255,.18) 0%, rgba(20,20,35,.35) 100%);
   }
   @keyframes liveBlurAnim{
-    0%{opacity:1;filter:blur(0px);}
-    40%{opacity:1;filter:blur(2px);}
-    100%{opacity:0;filter:blur(0px);}
+    0%{opacity:0;backdrop-filter:blur(0px);}
+    35%{opacity:1;backdrop-filter:blur(24px);}
+    70%{opacity:0.85;backdrop-filter:blur(14px);}
+    100%{opacity:0;backdrop-filter:blur(0px);}
+  }
+  #previewVideo.tr-blur-active{
+    animation:vidMotionBlur .46s ease-out forwards;
+  }
+  @keyframes vidMotionBlur{
+    0%{filter:blur(0px) scale(1);}
+    40%{filter:blur(12px) scale(1.035);}
+    100%{filter:blur(0px) scale(1);}
   }
   .transition-overlay.tr-zoom-active{animation:liveZoomAnim .44s cubic-bezier(.1,.9,.2,1) forwards;}
   @keyframes liveZoomAnim{
@@ -521,6 +543,46 @@
         <div data-i18n="dropHint">＋ Import video clips</div>
       </button>
       <input type="file" id="fileInput" accept="video/*" multiple class="hidden">
+      
+      <!-- Media actions toolbar (appears when clips are imported) -->
+      <div id="mediaActionsBar" class="media-actions-bar hidden">
+        <div class="media-actions-row">
+          <button type="button" class="btn-primary media-add-all-btn" id="addAllMediaBtn" onclick="addAllMediaToTimeline()" title="Add all imported scenes sorted in sequence">
+            <span>＋</span> <span id="addAllBtnText">Add All to Sequence</span>
+          </button>
+          <div class="media-sort-dropdown-wrap">
+            <button type="button" class="btn-ghost media-sort-btn" id="mediaSortBtn" onclick="toggleMediaSortMenu(event)" title="Change sort order for imported scenes">
+              <span id="mediaSortIcon">🔤</span> <span id="mediaSortLabel">Scene 1→N</span> ▾
+            </button>
+            <div id="mediaSortMenu" class="tl-popover tl-popover-relative hidden" style="width:195px">
+              <div class="tl-popover-title">Sort Imported Scenes</div>
+              <button type="button" class="tl-popover-item" data-sort="name-asc" onclick="changeMediaSort('name-asc')">
+                <span>🔤</span> Scene 1 → N (Natural)
+              </button>
+              <button type="button" class="tl-popover-item" data-sort="name-desc" onclick="changeMediaSort('name-desc')">
+                <span>🔤</span> Scene N → 1 (Reverse)
+              </button>
+              <button type="button" class="tl-popover-item" data-sort="import" onclick="changeMediaSort('import')">
+                <span>📥</span> Import Order
+              </button>
+              <button type="button" class="tl-popover-item" data-sort="dur-asc" onclick="changeMediaSort('dur-asc')">
+                <span>⏱️</span> Shortest First
+              </button>
+              <button type="button" class="tl-popover-item" data-sort="dur-desc" onclick="changeMediaSort('dur-desc')">
+                <span>⏱️</span> Longest First
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="media-actions-sub">
+          <span class="media-count-badge" id="mediaCountBadge">0 scenes</span>
+          <label style="font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="mediaAddReplaceToggle" checked style="accent-color:var(--ai);cursor:pointer">
+            <span>Replace sequence</span>
+          </label>
+        </div>
+      </div>
+
       <div id="mediaList"></div>
     </div>
 
@@ -576,6 +638,12 @@
               <option value="-1">♾️ Full Length (All Clips)</option>
             </select>
           </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;padding:6px 10px;background:var(--bg);border-radius:7px;border:1px solid var(--border)">
+          <label for="aiKeepSortedToggle" style="font-size:11px;color:var(--text);font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer" title="Ensure scenes follow sorted order (Scene 1 → N) in sequence after AI editing">
+            <span style="color:var(--ai)">🔤</span> <span id="keepSortedLabel">Keep Scenes Sorted in Sequence</span>
+          </label>
+          <input type="checkbox" id="aiKeepSortedToggle" checked style="accent-color:var(--ai);cursor:pointer;width:16px;height:16px" title="Ensure scenes follow sorted order (Scene 1 → N) in sequence after AI editing">
         </div>
         <select class="tpl" id="tplSelect" onchange="applyTemplate()">
           <option value="" data-i18n="tplCustom">Custom prompt instructions…</option>
@@ -679,12 +747,26 @@
         <button class="btn-ghost" id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
         <button class="btn-ghost" id="redoBtn" title="Redo (Ctrl+Y)">↷</button>
         <div class="tl-tools-sep"></div>
+        <!-- Sequence Sort Menu -->
+        <div style="position:relative;display:inline-block">
+          <button class="btn-ghost" id="sortSequenceBtn" onclick="toggleSortSequenceMenu(event)" title="Sort clips in sequence">
+            <span>🔤</span> <span id="sortSeqLabel">Sort</span> ▾
+          </button>
+          <div id="sortSequenceMenu" class="tl-popover tl-popover-relative hidden" style="width:215px">
+            <div class="tl-popover-title">Sort Sequence Clips</div>
+            <button type="button" class="tl-popover-item" onclick="sortTimelineSequence('name-asc')"><span>🔤</span> Scene 1 → N (Natural)</button>
+            <button type="button" class="tl-popover-item" onclick="sortTimelineSequence('name-desc')"><span>🔤</span> Scene N → 1 (Reverse)</button>
+            <button type="button" class="tl-popover-item" onclick="sortTimelineSequence('in-point')"><span>⏱️</span> Clip In-Point (Time)</button>
+            <button type="button" class="tl-popover-item" onclick="sortTimelineSequence('dur-asc')"><span>📏</span> Shortest First</button>
+            <button type="button" class="tl-popover-item" onclick="sortTimelineSequence('dur-desc')"><span>📐</span> Longest First</button>
+          </div>
+        </div>
         <!-- Global Transition selector -->
         <div style="position:relative;display:inline-block">
           <button class="btn-ghost" id="globalTransitionBtn" onclick="toggleGlobalTransitionMenu(event)" title="Apply transition to all cuts">
             <span id="gtIcon">⚡</span> <span id="gtLabel">Transitions</span> ▾
           </button>
-          <div id="globalTransitionMenu" class="tl-popover hidden" style="top:30px;right:0;width:200px">
+          <div id="globalTransitionMenu" class="tl-popover tl-popover-relative hidden" style="width:200px">
             <div class="tl-popover-title">Transitions (All Cuts)</div>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('flash')"><span>⚡</span> Flash Strobe</button>
             <button type="button" class="tl-popover-item" onclick="setAllTransitions('film')"><span>🎞️</span> Film Strip Roll</button>
@@ -852,6 +934,9 @@ const DICT = {
     aspectLabel:"Orientation & Aspect Ratio",
     resLabel:"Quality",
     startExportBtn:"Start Export",
+    addAllBtnText:"Add All to Sequence",
+    keepSortedLabel:"Keep Scenes Sorted in Sequence",
+    sortSeqLabel:"Sort",
   },
   id: {
     appName:"ClipForge AI", loginSub:"Masuk untuk mulai mengedit video marketing kamu dengan AI. Setiap akun punya proyek dan media sendiri.",
@@ -887,6 +972,9 @@ const DICT = {
     aspectLabel:"Orientasi & Rasio Aspek",
     resLabel:"Kualitas",
     startExportBtn:"Mulai Ekspor",
+    addAllBtnText:"Tambah Semua ke Sekuens",
+    keepSortedLabel:"Pertahankan Adegan Terurut",
+    sortSeqLabel:"Urutkan",
   }
 };
 let currentLang = 'en';
@@ -902,6 +990,13 @@ function setLang(l){
     const k = el.getAttribute('data-i18n-ph');
     if(DICT[l][k]) el.setAttribute('placeholder', DICT[l][k]);
   });
+  const addAllEl = document.getElementById('addAllBtnText');
+  if(addAllEl) addAllEl.textContent = DICT[l].addAllBtnText;
+  const keepSortEl = document.getElementById('keepSortedLabel');
+  if(keepSortEl) keepSortEl.textContent = DICT[l].keepSortedLabel;
+  const sortSeqEl = document.getElementById('sortSeqLabel');
+  if(sortSeqEl) sortSeqEl.textContent = DICT[l].sortSeqLabel;
+  updateMediaSortUI();
   renderMediaList(); renderTimeline();
 }
 function t(key){ return (DICT[currentLang] && DICT[currentLang][key]) || key; }
@@ -1165,13 +1260,74 @@ function switchTab(tab){
   }
 }
 
-/* ===================== import & media bin ===================== */
+/* ===================== import, media bin & sequence ordering ===================== */
+let currentMediaSortMode = 'name-asc';
+
+function naturalCompare(a, b){
+  return String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function getSortLabel(mode){
+  const labels = {
+    'name-asc': currentLang === 'id' ? 'Adegan 1 → N' : 'Scene 1 → N',
+    'name-desc': currentLang === 'id' ? 'Adegan N → 1' : 'Scene N → 1',
+    'import': currentLang === 'id' ? 'Urutan Impor' : 'Import Order',
+    'dur-asc': currentLang === 'id' ? 'Durasi Min' : 'Shortest',
+    'dur-desc': currentLang === 'id' ? 'Durasi Max' : 'Longest',
+    'in-point': currentLang === 'id' ? 'In-Point' : 'In-Point'
+  };
+  return labels[mode] || mode;
+}
+
+function getSortedMedia(mode = currentMediaSortMode){
+  const copy = [...media];
+  if(mode === 'name-asc'){
+    copy.sort((a, b) => naturalCompare(a.name, b.name));
+  } else if(mode === 'name-desc'){
+    copy.sort((a, b) => naturalCompare(b.name, a.name));
+  } else if(mode === 'dur-asc'){
+    copy.sort((a, b) => (a.duration || 0) - (b.duration || 0));
+  } else if(mode === 'dur-desc'){
+    copy.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+  } else if(mode === 'import'){
+    // Keeps original import array order
+  }
+  return copy;
+}
+
 function triggerImport(){ document.getElementById('fileInput').click(); }
 document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const files = Array.from(e.target.files);
+  // Sort files naturally by filename on import so multi-selected files enter in proper order
+  files.sort((a, b) => naturalCompare(a.name, b.name));
   for(const f of files){ await addMediaFile(f); }
   e.target.value = '';
 });
+
+// Drag & drop support on media panel
+const mediaBodyEl = document.getElementById('tabMediaBody');
+if(mediaBodyEl){
+  mediaBodyEl.addEventListener('dragover', (e)=>{
+    if(e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')){
+      e.preventDefault();
+      mediaBodyEl.classList.add('drag-over');
+    }
+  });
+  mediaBodyEl.addEventListener('dragleave', (e)=>{
+    if(!mediaBodyEl.contains(e.relatedTarget)){
+      mediaBodyEl.classList.remove('drag-over');
+    }
+  });
+  mediaBodyEl.addEventListener('drop', async (e)=>{
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      e.preventDefault();
+      mediaBodyEl.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(f.name));
+      files.sort((a, b) => naturalCompare(a.name, b.name));
+      for(const f of files){ await addMediaFile(f); }
+    }
+  });
+}
 
 function addMediaFile(file){
   return new Promise((resolve)=>{
@@ -1199,32 +1355,127 @@ function addMediaFile(file){
   });
 }
 
+function updateMediaSortUI(){
+  const labelEl = document.getElementById('mediaSortLabel');
+  if(labelEl) labelEl.textContent = getSortLabel(currentMediaSortMode);
+  document.querySelectorAll('#mediaSortMenu .tl-popover-item').forEach(btn => {
+    const mode = btn.getAttribute('data-sort');
+    btn.classList.toggle('active', mode === currentMediaSortMode);
+  });
+}
+
+function toggleMediaSortMenu(e){
+  if(e) e.stopPropagation();
+  const menu = document.getElementById('mediaSortMenu');
+  if(menu) menu.classList.toggle('hidden');
+}
+
+function changeMediaSort(mode){
+  currentMediaSortMode = mode;
+  const menu = document.getElementById('mediaSortMenu');
+  if(menu) menu.classList.add('hidden');
+  updateMediaSortUI();
+  renderMediaList();
+  showToast(currentLang === 'id' ? `Daftar adegan diurutkan: ${getSortLabel(mode)}` : `Scenes sorted: ${getSortLabel(mode)}`);
+}
+
 function renderMediaList(){
   const list = document.getElementById('mediaList');
+  const bar = document.getElementById('mediaActionsBar');
+  const countBadge = document.getElementById('mediaCountBadge');
   if(media.length===0){
+    if(bar) bar.classList.add('hidden');
     list.innerHTML = `<div style="color:var(--muted-2);font-size:12px;padding:8px 2px">${t('emptyMedia')}</div>`;
     return;
   }
-  list.innerHTML = media.map(m=>`
+  if(bar) bar.classList.remove('hidden');
+  if(countBadge) countBadge.textContent = `${media.length} ${currentLang==='id'?'adegan':'scenes'}`;
+
+  // Render scenes in sorted order with sequence index badge
+  const sorted = getSortedMedia(currentMediaSortMode);
+  list.innerHTML = sorted.map((m, idx)=>`
     <div class="media-item" draggable="true" data-mid="${m.id}" ondragstart="onMediaDragStart(event,'${m.id}')">
-      <img class="media-thumb" src="${m.thumb}" onclick="previewMedia('${m.id}')" style="cursor:pointer">
+      <div style="position:relative;flex:none">
+        <img class="media-thumb" src="${m.thumb}" onclick="previewMedia('${m.id}')" style="cursor:pointer" title="${currentLang==='id'?'Klik untuk pratinjau':'Click to preview'}">
+        <span class="media-order-badge" title="${currentLang==='id'?'Urutan sekuens adegan':'Scene sequence order'}">#${idx+1}</span>
+      </div>
       <div class="media-meta" style="flex:1;min-width:0" onclick="previewMedia('${m.id}')">
-        <div class="media-name">${escapeHtml(m.name)}</div>
+        <div class="media-name" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</div>
         <div class="media-dur mono">${fmtTime(m.duration)}</div>
         <span class="media-tag">${currentLang==='id'?'seret, atau klik +':'drag, or click +'}</span>
       </div>
-      <button class="media-add-btn" title="${currentLang==='id'?'Tambah ke timeline':'Add to timeline'}" onclick="event.stopPropagation();addMediaToTimeline('${m.id}')">+</button>
+      <button class="media-add-btn" title="${currentLang==='id'?'Tambah ke sekuens':'Add to sequence'}" onclick="event.stopPropagation();addMediaToTimeline('${m.id}')">+</button>
     </div>
   `).join('');
 }
+
 function addMediaToTimeline(mid){
   const m = media.find(x=>x.id===mid);
   if(!m) return;
-  timeline.push({id:'t'+(uidCounter++), mediaId:m.id, name:m.name, url:m.url,
-    duration:m.duration, trimIn:0, trimOut:m.duration});
+  pushTimelineHistory();
+  const transSelect = document.getElementById('autoEditTransitionSelect');
+  const preferredTrans = transSelect ? transSelect.value : 'flash';
+  timeline.push({
+    id: 't'+(uidCounter++),
+    mediaId: m.id,
+    name: m.name,
+    url: m.url,
+    duration: m.duration,
+    trimIn: 0,
+    trimOut: m.duration,
+    transition: timeline.length === 0 ? 'cut' : preferredTrans,
+    highlights: m.highlights || []
+  });
   renderTimeline();
-  showToast(currentLang==='id' ? `${m.name} ditambahkan ke timeline` : `${m.name} added to timeline`);
+  showToast(currentLang==='id' ? `${m.name} ditambahkan ke sekuens` : `${m.name} added to sequence`);
 }
+
+function addAllMediaToTimeline(opts = {}){
+  if(!media.length){
+    showToast(currentLang==='id'?'Belum ada adegan yang diimpor':'No imported scenes to add');
+    return;
+  }
+  pushTimelineHistory();
+  const sortMode = opts.sortMode || currentMediaSortMode || 'name-asc';
+  const replaceToggle = document.getElementById('mediaAddReplaceToggle');
+  const replace = opts.replace !== undefined ? opts.replace : (replaceToggle ? replaceToggle.checked : (timeline.length === 0));
+
+  const sorted = getSortedMedia(sortMode);
+  const transSelect = document.getElementById('autoEditTransitionSelect');
+  const preferredTrans = transSelect ? transSelect.value : 'flash';
+
+  const newClips = sorted.map((m, idx)=>({
+    id: 't' + (uidCounter++),
+    mediaId: m.id,
+    name: m.name,
+    url: m.url,
+    duration: m.duration,
+    trimIn: 0,
+    trimOut: m.duration,
+    transition: (replace ? idx === 0 : (timeline.length === 0 && idx === 0)) ? 'cut' : preferredTrans,
+    highlights: m.highlights || []
+  }));
+
+  if(replace){
+    timeline = newClips;
+  } else {
+    timeline = timeline.concat(newClips);
+  }
+
+  selectedClipId = timeline[0]?.id || null;
+  renderTimeline();
+
+  const sortLabel = getSortLabel(sortMode);
+  showToast(currentLang==='id'
+    ? `${newClips.length} adegan ditambahkan ke sekuens (${sortLabel})`
+    : `Added ${newClips.length} scenes sorted in sequence (${sortLabel})`
+  );
+
+  if(seq.mode !== 'sequence' && timeline.length){
+    loadSeqClip(0, false);
+  }
+}
+window.addAllMediaToTimeline = addAllMediaToTimeline;
 
 function previewMedia(mid){
   const m = media.find(x=>x.id===mid);
@@ -1421,6 +1672,44 @@ function applyActiveCutTransitionToAll(){
   setAllTransitions(type);
 }
 
+/* Sequence sorting logic */
+function toggleSortSequenceMenu(e){
+  if(e) e.stopPropagation();
+  const menu = document.getElementById('sortSequenceMenu');
+  if(menu) menu.classList.toggle('hidden');
+}
+
+function sortTimelineSequence(mode = 'name-asc'){
+  const menu = document.getElementById('sortSequenceMenu');
+  if(menu) menu.classList.add('hidden');
+  if(!timeline.length){
+    showToast(currentLang==='id'?'Sekuens masih kosong':'Sequence is empty');
+    return;
+  }
+  pushTimelineHistory();
+  const sorted = [...timeline];
+  if(mode === 'name-asc'){
+    sorted.sort((a, b) => naturalCompare(a.name, b.name) || ((a.trimIn||0) - (b.trimIn||0)));
+  } else if(mode === 'name-desc'){
+    sorted.sort((a, b) => naturalCompare(b.name, a.name) || ((a.trimIn||0) - (b.trimIn||0)));
+  } else if(mode === 'in-point'){
+    sorted.sort((a, b) => (a.trimIn || 0) - (b.trimIn || 0));
+  } else if(mode === 'dur-asc'){
+    sorted.sort((a, b) => ((a.trimOut - a.trimIn) || 0) - ((b.trimOut - b.trimIn) || 0));
+  } else if(mode === 'dur-desc'){
+    sorted.sort((a, b) => ((b.trimOut - b.trimIn) || 0) - ((a.trimOut - a.trimIn) || 0));
+  }
+  // Ensure the very first cut has transition 'cut'
+  if(sorted.length > 0){
+    sorted[0].transition = 'cut';
+  }
+  timeline = sorted;
+  selectedClipId = timeline[0]?.id || null;
+  renderTimeline();
+  showToast(currentLang==='id' ? `Sekuens diurutkan: ${getSortLabel(mode)}` : `Sequence sorted: ${getSortLabel(mode)}`);
+}
+window.sortTimelineSequence = sortTimelineSequence;
+
 // Global click dismisses popovers
 document.addEventListener('click', (e)=>{
   const gMenu = document.getElementById('globalTransitionMenu');
@@ -1430,6 +1719,14 @@ document.addEventListener('click', (e)=>{
   const cMenu = document.getElementById('clipTransitionMenu');
   if(cMenu && !cMenu.contains(e.target) && !e.target.closest('.tl-transition-badge')){
     cMenu.classList.add('hidden');
+  }
+  const mMenu = document.getElementById('mediaSortMenu');
+  if(mMenu && !mMenu.contains(e.target) && e.target.id !== 'mediaSortBtn' && !e.target.closest('#mediaSortBtn')){
+    mMenu.classList.add('hidden');
+  }
+  const sMenu = document.getElementById('sortSequenceMenu');
+  if(sMenu && !sMenu.contains(e.target) && e.target.id !== 'sortSequenceBtn' && !e.target.closest('#sortSequenceBtn')){
+    sMenu.classList.add('hidden');
   }
 });
 
@@ -2253,7 +2550,7 @@ async function runPromptEdit(){
       }
     }
 
-    const availableClips = media.length ? media : timeline;
+    const availableClips = (media.length ? media : timeline).slice().sort((a, b) => naturalCompare(a.name || '', b.name || ''));
     const clipSummaryData = availableClips.map(m=>({
       id: m.id,
       name: m.name,
@@ -2268,6 +2565,11 @@ Style: ${currentStyle} (viral / hook / yt_long / explainer / cinematic / beat)
 Transition Preference: ${transPref} (flash, film, blur, zoom, glitch, wipe, leak, spin, fade, dip, cut, mix)
 Target Duration: ${targetDurStr}
 User custom prompt / note: "${prompt || 'Auto edit my clips with optimal pacing and transitions'}"
+
+CRITICAL SEQUENCING INSTRUCTION:
+Maintain natural sequential progression of scenes (Scene 1 -> Scene 2 -> Scene 3 -> ...).
+Do NOT randomize or scramble the scenes.
+The cuts must advance in proper scene order, and within each scene advance chronologically (trimIn < trimOut).
 
 Available Clips with real detected energy moments:
 ${JSON.stringify(clipSummaryData)}
@@ -2337,9 +2639,12 @@ function runSmartAutoEditEngine(clips, opts){
   let cutIdx = 0;
   const target = Number(opts.targetDur) || 0;
 
+  // Ensure clips are evaluated in natural sorted sequence order
+  const sortedClips = [...clips].sort((a, b) => naturalCompare(a.name || '', b.name || ''));
+
   if(target === -1){
     // Full Length: keep entire clips
-    clips.forEach((c, idx)=>{
+    sortedClips.forEach((c, idx)=>{
       const dur = c.duration || 5;
       cuts.push({
         clipName: c.name,
@@ -2349,10 +2654,10 @@ function runSmartAutoEditEngine(clips, opts){
       });
     });
   } else if(target > 0){
-    // Target duration budget distributed across clips
-    const numClips = clips.length || 1;
+    // Target duration budget distributed across clips in sequence
+    const numClips = sortedClips.length || 1;
     const durPerClip = Math.max(1.8, target / numClips);
-    clips.forEach((c, idx)=>{
+    sortedClips.forEach((c, idx)=>{
       const dur = c.duration || 5;
       let sliceIn = 0;
       let sliceOut = Math.min(dur, durPerClip);
@@ -2369,13 +2674,14 @@ function runSmartAutoEditEngine(clips, opts){
       });
     });
   } else {
-    // Auto mode according to style
-    clips.forEach((c, idx)=>{
+    // Auto mode according to style in sequence
+    sortedClips.forEach((c, idx)=>{
       const dur = c.duration || 5;
       const trans = idx === 0 ? 'cut' : (opts.transitionPref === 'mix' ? mixTransitions[(idx - 1) % mixTransitions.length] : baseTrans);
 
       if(c.highlights && c.highlights.length){
-        const best = c.highlights.slice(0, 2);
+        // Chronological highlight slices
+        const best = [...c.highlights].slice(0, 2).sort((a, b) => (a.start || 0) - (b.start || 0));
         best.forEach(h=>{
           const sliceIn = Math.max(0, h.start - 0.2);
           const minLen = opts.style === 'yt_long' ? 6.0 : (opts.style === 'explainer' ? 8.0 : 2.5);
@@ -2406,8 +2712,8 @@ function runSmartAutoEditEngine(clips, opts){
 
   return {
     summary: currentLang==='id' 
-      ? `Auto-edit ritmik ${cuts.length} potongan dengan transisi ${getTransitionLabel(opts.transitionPref)} dan pemotongan momen terbaik.`
-      : `High-retention auto-edit of ${cuts.length} cuts with ${getTransitionLabel(opts.transitionPref)} transitions and highlight pacing.`,
+      ? `Auto-edit terurut ${cuts.length} potongan dengan transisi ${getTransitionLabel(opts.transitionPref)} dan pemotongan momen terbaik.`
+      : `High-retention sorted auto-edit of ${cuts.length} cuts with ${getTransitionLabel(opts.transitionPref)} transitions and highlight pacing.`,
     hookLine: currentLang==='id' ? "Trik yang harus kamu tahu sebelum mulai!" : "Wait until you see this game-changing trick...",
     captionIdeas: [
       currentLang==='id' ? "Tonton sampai akhir 🔥" : "Wait for the end 🔥",
@@ -2421,16 +2727,18 @@ function runSmartAutoEditEngine(clips, opts){
 function applyAutoEditToTimeline(cuts, defaultTrans){
   if(!cuts || !cuts.length) return;
   pushTimelineHistory();
-  const sourceMedia = media.length ? media : timeline;
-  const newTimeline = [];
+  const sourceMedia = (media.length ? media : timeline).slice();
+  const sortedSourceMedia = sourceMedia.slice().sort((a, b) => naturalCompare(a.name || '', b.name || ''));
+  const keepSorted = document.getElementById('aiKeepSortedToggle')?.checked !== false;
 
+  const resolved = [];
   cuts.forEach((cut, i)=>{
     const cleanName = String(cut.clipName||'').trim().toLowerCase();
-    const m = sourceMedia.find(x => 
+    const m = sortedSourceMedia.find(x => 
       (x.name && x.name.trim().toLowerCase() === cleanName) ||
       (x.name && x.name.toLowerCase().includes(cleanName)) ||
       (cleanName && cleanName.includes(x.name?.toLowerCase()))
-    ) || sourceMedia[i % sourceMedia.length];
+    ) || sortedSourceMedia[i % sortedSourceMedia.length];
 
     if(m){
       const maxDur = m.duration || 10;
@@ -2438,32 +2746,67 @@ function applyAutoEditToTimeline(cuts, defaultTrans){
       let tOut = Math.min(maxDur, Number(cut.trimOut) || (tIn + 3));
       if(tOut <= tIn + 0.2) tOut = Math.min(maxDur, tIn + 2.5);
 
-      const trans = i === 0 ? 'cut' : (cut.transition || defaultTrans || 'flash');
-
-      newTimeline.push({
-        id: 't' + (uidCounter++),
+      const sceneIndex = sortedSourceMedia.indexOf(m);
+      resolved.push({
+        origIndex: i,
         mediaId: m.id || m.mediaId,
         name: m.name,
         url: m.url,
         duration: maxDur,
         trimIn: tIn,
         trimOut: tOut,
-        transition: trans,
-        highlights: m.highlights || []
+        transition: cut.transition || defaultTrans || 'flash',
+        highlights: m.highlights || [],
+        sceneIndex: sceneIndex >= 0 ? sceneIndex : 999
       });
     }
   });
 
-  if(newTimeline.length){
-    timeline = newTimeline;
-    selectedClipId = timeline[0]?.id || null;
-    renderTimeline();
-    const gtIcon = document.getElementById('gtIcon');
-    const gtLabel = document.getElementById('gtLabel');
-    if(gtIcon && gtLabel){
-      gtIcon.textContent = defaultTrans === 'mix' ? '🔀' : getTransitionIcon(defaultTrans);
-      gtLabel.textContent = defaultTrans === 'mix' ? 'Smart Dynamic Mix' : getTransitionLabel(defaultTrans);
+  if(!resolved.length) return;
+
+  let orderedCuts = resolved;
+  if(keepSorted){
+    // If autoEditStyle is 'hook' and user has an intentional opener hook from a different scene:
+    if((autoEditStyle === 'hook' || autoEditStyle === 'viral') && resolved.length > 1 && resolved[0].sceneIndex !== 0){
+      const hook = resolved[0];
+      const rest = resolved.slice(1);
+      rest.sort((a, b) => {
+        if(a.sceneIndex !== b.sceneIndex) return a.sceneIndex - b.sceneIndex;
+        return a.trimIn - b.trimIn;
+      });
+      orderedCuts = [hook, ...rest];
+    } else {
+      orderedCuts = [...resolved].sort((a, b) => {
+        if(a.sceneIndex !== b.sceneIndex) return a.sceneIndex - b.sceneIndex;
+        return a.trimIn - b.trimIn;
+      });
     }
+  }
+
+  const mixPool = ['flash', 'film', 'blur', 'zoom', 'glitch', 'wipe', 'leak', 'fade'];
+  const newTimeline = orderedCuts.map((c, idx) => {
+    let trans = idx === 0 ? 'cut' : (defaultTrans === 'mix' ? mixPool[(idx - 1) % mixPool.length] : (c.transition || defaultTrans || 'flash'));
+    return {
+      id: 't' + (uidCounter++),
+      mediaId: c.mediaId,
+      name: c.name,
+      url: c.url,
+      duration: c.duration,
+      trimIn: c.trimIn,
+      trimOut: c.trimOut,
+      transition: trans,
+      highlights: c.highlights || []
+    };
+  });
+
+  timeline = newTimeline;
+  selectedClipId = timeline[0]?.id || null;
+  renderTimeline();
+  const gtIcon = document.getElementById('gtIcon');
+  const gtLabel = document.getElementById('gtLabel');
+  if(gtIcon && gtLabel){
+    gtIcon.textContent = defaultTrans === 'mix' ? '🔀' : getTransitionIcon(defaultTrans);
+    gtLabel.textContent = defaultTrans === 'mix' ? 'Smart Dynamic Mix' : getTransitionLabel(defaultTrans);
   }
 }
 
@@ -3022,6 +3365,11 @@ function buildViralHighlightReel(){
     return;
   }
 
+  const keepSorted = document.getElementById('aiKeepSortedToggle')?.checked !== false;
+  if(keepSorted){
+    topPicks.sort((a, b) => naturalCompare(a.clip.name, b.clip.name) || ((a.highlight.start || 0) - (b.highlight.start || 0)));
+  }
+
   const newTl = [];
   const transPool = ['flash', 'film', 'blur', 'fade'];
   topPicks.forEach((item, idx)=>{
@@ -3223,7 +3571,39 @@ async function runAutoEditAll(){
       }
     }catch(aiErr){ console.warn('AI ordering unavailable; deterministic smart edit used',aiErr); }
     if(!plan.length) throw new Error(currentLang==='id'?'Tidak ditemukan momen yang bisa diedit':'No usable moments found');
-    timeline=plan.map(e=>{const m=media.find(x=>x.id===e.mediaId);return {id:'t'+(uidCounter++),mediaId:m.id,name:m.name,url:m.url,duration:m.duration,trimIn:e.start,trimOut:e.end,highlights:m.highlights||[]};});
+    
+    const keepSorted = document.getElementById('aiKeepSortedToggle')?.checked !== false;
+    if(keepSorted && plan.length){
+      plan.sort((a, b) => {
+        const ma = media.find(x => x.id === a.mediaId);
+        const mb = media.find(x => x.id === b.mediaId);
+        const nameCmp = naturalCompare(ma?.name || '', mb?.name || '');
+        if(nameCmp !== 0) return nameCmp;
+        return (a.start || 0) - (b.start || 0);
+      });
+    }
+
+    pushTimelineHistory();
+    const transSelect = document.getElementById('autoEditTransitionSelect');
+    const preferredTrans = transSelect ? transSelect.value : 'flash';
+    const mixPool = ['flash', 'film', 'blur', 'zoom', 'glitch', 'wipe', 'leak', 'fade'];
+
+    timeline = plan.map((e, idx)=>{
+      const m = media.find(x=>x.id===e.mediaId);
+      const trans = idx === 0 ? 'cut' : (preferredTrans === 'mix' ? mixPool[(idx - 1) % mixPool.length] : preferredTrans);
+      return {
+        id: 't'+(uidCounter++),
+        mediaId: m.id,
+        name: m.name,
+        url: m.url,
+        duration: m.duration,
+        trimIn: e.start,
+        trimOut: e.end,
+        transition: trans,
+        highlights: m.highlights||[]
+      };
+    });
+    selectedClipId = timeline[0]?.id || null;
     renderTimeline();
     const total=timeline.reduce((n,c)=>n+c.trimOut-c.trimIn,0);
     const el=document.getElementById('resultsBody');clearEmptyRight();
